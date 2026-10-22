@@ -6,7 +6,12 @@ import {
   Play,
   PlusCircle,
   LogIn,
-  ShieldCheck,
+  Crown,
+  Clock,
+  Compass,
+  ArrowRight,
+  Shield,
+  Layers,
   Sparkles,
 } from 'lucide-react';
 
@@ -37,6 +42,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onStartGame,
   onLeaveRoom,
 }) => {
+  const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
   const [joinCode, setJoinCode] = useState('');
   const [maxPlayers, setMaxPlayers] = useState<number>(4);
   const [metropolisSide, setMetropolisSide] = useState<'A' | 'B'>('A');
@@ -58,7 +64,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const handleCreate = async () => {
     if (!playerName.trim()) {
-      setError('Lütfen bir oyuncu adı girin.');
+      setError('Lütfen oyuna başlamadan önce bir isim girin.');
       return;
     }
     try {
@@ -78,7 +84,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   const handleJoin = async () => {
     if (!playerName.trim()) {
-      setError('Lütfen bir oyuncu adı girin.');
+      setError('Lütfen oyuna başlamadan önce bir isim girin.');
       return;
     }
     if (!joinCode.trim()) {
@@ -97,258 +103,367 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-        {/* Dekoratif Arka Plan Parıltısı */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between items-center p-4 sm:p-8 font-sans selection:bg-amber-500 selection:text-slate-950 relative overflow-hidden">
+      {/* Yumuşak Catan Renk Atmosferi (Gradient Işıklar) */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-red-700/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 mb-3 shadow-inner">
-            <Sparkles size={32} />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-wide">
-            CATAN · On the Road
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Online Çok Oyunculu Kart Oyunu (3 - 4 Oyuncu)
-          </p>
+      {/* ÜST BAŞLIK & MARKA */}
+      <header className="w-full max-w-lg text-center pt-4 pb-2 z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-3 tracking-wide">
+          <Compass size={14} className="text-amber-400" />
+          <span>CATAN · ON THE ROAD</span>
         </div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+          Yolculuk Başlıyor
+        </h1>
+        <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">
+          3 veya 4 oyuncuyla, masaüstü kurallarına sadık çevrim içi kart oyunu.
+        </p>
+      </header>
 
+      {/* ANA KART / PANEL */}
+      <main className="w-full max-w-lg bg-slate-900/80 border border-slate-800 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-2xl z-10">
         {error && (
-          <div className="bg-red-950/60 border border-red-500 rounded-xl p-3 mb-4 text-xs text-red-200">
-            {error}
+          <div className="bg-red-950/60 border border-red-500/50 rounded-2xl p-3.5 mb-5 text-xs text-red-200 flex items-center gap-2.5 animate-in fade-in duration-200">
+            <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+            <span className="flex-1 font-medium">{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="text-slate-400 hover:text-white text-xs px-1"
+            >
+              ✕
+            </button>
           </div>
         )}
 
-        {/* Oyuncu Adı Girişi */}
+        {/* 1. KULLANICI İSMİ GİRİŞİ */}
         <div className="mb-6">
-          <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-            Oyuncu Adınız
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+            Oyuncu Takma Adı
           </label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={(e) => onUpdatePlayerName(e.target.value)}
-            disabled={!!room}
-            maxLength={20}
-            placeholder="Adınızı girin..."
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition disabled:opacity-60"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => onUpdatePlayerName(e.target.value)}
+              disabled={!!room}
+              maxLength={18}
+              placeholder="Adınızı yazın (Örn: Sina)..."
+              className="w-full bg-slate-950 border border-slate-700/80 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-500 transition outline-none disabled:opacity-50"
+            />
+            {playerName && (
+              <span className="absolute right-3.5 top-3.5 text-xs text-emerald-400 flex items-center gap-1 font-medium">
+                <Check size={14} /> Hazır
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* LOBİ BEKLEME ODASI (Odaya katılmışsa) */}
+        {/* 2. DURUM: ODA KURULMUŞ / BEKLEME LOBİSİ */}
         {room ? (
-          <div className="space-y-5 animate-in fade-in duration-300">
-            {/* Oda Kodu Kutusu */}
-            <div className="bg-slate-950 border-2 border-dashed border-amber-500/60 rounded-2xl p-4 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider block">
-                  Oda Kodu (Arkadaşlarınla Paylaş)
-                </span>
-                <span className="text-2xl font-black text-white tracking-widest">
-                  {room.code}
-                </span>
+          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            {/* Oda Kodu Gösterim Kartı */}
+            <div className="bg-gradient-to-br from-amber-500/10 via-slate-950 to-slate-950 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400 block mb-1">
+                    Oda Davet Kodu
+                  </span>
+                  <div className="text-3xl sm:text-4xl font-black text-white tracking-widest font-mono">
+                    {room.code}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl font-bold text-xs transition shadow-md shadow-amber-500/10"
+                >
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                  <span>{copied ? 'Kopyalandı' : 'Kodu Paylaş'}</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold transition"
-              >
-                {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                <span>{copied ? 'Kopyalandı!' : 'Kopyala'}</span>
-              </button>
+              <div className="text-[11px] text-slate-400 mt-2.5 flex items-center gap-1.5">
+                <span>Arkadaşlarınız bu kodla odaya katılabilir.</span>
+              </div>
             </div>
 
-            {/* Oyuncu Listesi */}
+            {/* Oyuncular Listesi */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-400">
-                  Katılan Oyuncular ({players.length} / {room.max_players})
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Users size={14} /> Masadakiler ({players.length}/{room.max_players})
                 </span>
-                <span className="text-[10px] text-amber-400 font-bold">
-                  {players.length >= 3 ? 'Başlamaya Hazır' : 'En az 3 oyuncu bekleniyor'}
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  players.length >= 3
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {players.length >= 3 ? 'Başlamaya Hazır' : 'Oyuncu Bekleniyor'}
                 </span>
               </div>
 
               <div className="space-y-2">
-                {players.map((p, idx) => (
-                  <div
-                    key={p.user_id}
-                    className="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-xs font-bold">
-                        {idx + 1}
+                {players.map((p, idx) => {
+                  const isCurrent = p.user_id === currentUserId;
+                  return (
+                    <div
+                      key={p.user_id}
+                      className={`flex items-center justify-between p-3 rounded-2xl border transition ${
+                        isCurrent
+                          ? 'bg-amber-500/10 border-amber-500/40 text-white'
+                          : 'bg-slate-950/60 border-slate-800/80 text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                          p.is_host
+                            ? 'bg-amber-500 text-slate-950 shadow-sm'
+                            : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold block leading-tight">
+                            {p.name}
+                          </span>
+                          {isCurrent && (
+                            <span className="text-[10px] text-amber-400 font-medium">
+                              (Senin Hesabın)
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-slate-200">
-                        {p.name} {p.user_id === currentUserId && <span className="text-amber-400 text-xs">(Sen)</span>}
-                      </span>
-                    </div>
 
-                    {p.is_host && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
-                        <ShieldCheck size={12} />
-                        Kurucu
-                      </span>
-                    )}
+                      {p.is_host && (
+                        <div className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2.5 py-1 rounded-full text-[10px] font-bold">
+                          <Crown size={12} /> Kurucu
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Boş Kalan Koltuklar */}
+                {Array.from({ length: room.max_players - players.length }).map((_, i) => (
+                  <div
+                    key={`empty-${i}`}
+                    className="flex items-center gap-3 p-3 rounded-2xl border border-dashed border-slate-800 text-slate-600 text-xs italic"
+                  >
+                    <div className="w-8 h-8 rounded-xl border border-dashed border-slate-800 flex items-center justify-center">
+                      {players.length + i + 1}
+                    </div>
+                    <span>Oyuncu bekleniyor...</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Alt Butonlar */}
-            <div className="pt-2 space-y-2">
+            {/* Eylemler: Başlat & Ayrıl */}
+            <div className="pt-2 space-y-2.5">
               {isHost ? (
                 <button
                   type="button"
                   onClick={onStartGame}
                   disabled={!canStart || loading}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold rounded-xl transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 disabled:opacity-40"
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black rounded-2xl text-sm transition shadow-xl shadow-emerald-950/40 flex items-center justify-center gap-2 disabled:opacity-40"
                 >
                   <Play size={18} />
-                  <span>{loading ? 'Başlatılıyor...' : 'Oyunu Başlat'}</span>
+                  <span>{loading ? 'Oyun Başlatılıyor...' : 'Oyunu Başlat'}</span>
                 </button>
               ) : (
-                <div className="text-center text-xs text-slate-400 py-2 italic">
-                  Oda kurucusunun oyunu başlatması bekleniyor...
+                <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span>Oda kurucusunun oyunu başlatması bekleniyor...</span>
                 </div>
               )}
 
               <button
                 type="button"
                 onClick={onLeaveRoom}
-                className="w-full py-2.5 text-xs text-slate-400 hover:text-red-400 bg-slate-950/50 hover:bg-slate-950 rounded-xl transition"
+                className="w-full py-3 text-xs font-semibold text-slate-400 hover:text-red-400 bg-slate-950/40 hover:bg-slate-950 rounded-2xl transition border border-transparent hover:border-slate-800"
               >
                 Odadan Ayrıl
               </button>
             </div>
           </div>
         ) : (
-          /* ODA OLUŞTUR / KATIL SEÇENEKLERİ */
-          <div className="space-y-6">
-            {/* Odaya Katıl */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4">
-              <span className="text-xs font-bold uppercase text-slate-400 block mb-2">
-                Odaya Katıl
-              </span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="6 Haneli Kod"
-                  maxLength={6}
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-center font-bold tracking-widest text-amber-400 focus:outline-none focus:border-amber-500"
-                />
+          /* 3. DURUM: ODA KURMA VEYA KATILMA SEKMELERİ */
+          <div>
+            {/* Sekme Butonları */}
+            <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-2xl border border-slate-800 mb-6">
+              <button
+                type="button"
+                onClick={() => setActiveTab('join')}
+                className={`py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  activeTab === 'join'
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <LogIn size={15} />
+                <span>Odaya Katıl</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('create')}
+                className={`py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  activeTab === 'create'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <PlusCircle size={15} />
+                <span>Oda Oluştur</span>
+              </button>
+            </div>
+
+            {/* SEKME 1: ODAYA KATIL */}
+            {activeTab === 'join' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    6 Haneli Oda Kodu
+                  </label>
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Örn: 7TK49A"
+                    maxLength={6}
+                    className="w-full bg-slate-950 border border-slate-700/80 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 rounded-2xl p-4 text-center text-xl font-mono font-black tracking-widest text-amber-400 placeholder-slate-700 outline-none transition"
+                  />
+                </div>
+
                 <button
                   type="button"
                   onClick={handleJoin}
                   disabled={loading}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition"
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black rounded-2xl text-sm transition shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2"
                 >
-                  <LogIn size={16} />
-                  <span>Katıl</span>
+                  <ArrowRight size={18} />
+                  <span>{loading ? 'Bağlanılıyor...' : 'Odaya Gir'}</span>
                 </button>
               </div>
-            </div>
+            )}
 
-            {/* Oda Oluştur */}
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-4">
-              <span className="text-xs font-bold uppercase text-slate-400 block">
-                Yeni Oda Oluştur
-              </span>
+            {/* SEKME 2: YENİ ODA OLUŞTUR */}
+            {activeTab === 'create' && (
+              <div className="space-y-5 animate-in fade-in duration-200">
+                {/* Oyuncu Sayısı */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Oyuncu Kapasitesi
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[3, 4].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setMaxPlayers(n)}
+                        className={`py-3 rounded-2xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+                          maxPlayers === n
+                            ? 'border-amber-500 bg-amber-500/10 text-amber-300'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <Users size={15} />
+                        <span>{n} Oyuncu</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Oyuncu Sayısı */}
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Kapasite</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[3, 4].map((n) => (
+                {/* Büyükşehir Modu */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Büyükşehir Tipi
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
-                      key={n}
                       type="button"
-                      onClick={() => setMaxPlayers(n)}
-                      className={`py-2 rounded-xl text-xs font-bold border transition ${
-                        maxPlayers === n
-                          ? 'border-amber-500 bg-amber-950/40 text-amber-300'
-                          : 'border-slate-800 bg-slate-900 text-slate-400'
+                      onClick={() => setMetropolisSide('A')}
+                      className={`p-3 rounded-2xl text-left border transition ${
+                        metropolisSide === 'A'
+                          ? 'border-amber-500 bg-amber-500/10 text-amber-300'
+                          : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
                       }`}
                     >
-                      {n} Oyuncu
+                      <div className="text-xs font-bold flex items-center gap-1.5">
+                        <Layers size={14} /> A Tarafı (Klasik)
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        Tüm şehirlere standart bonus
+                      </div>
                     </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Büyükşehir Modu */}
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Büyükşehir Modu</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setMetropolisSide('A')}
-                    className={`py-2 px-2 rounded-xl text-xs font-semibold border transition text-left ${
-                      metropolisSide === 'A'
-                        ? 'border-amber-500 bg-amber-950/40 text-amber-300'
-                        : 'border-slate-800 bg-slate-900 text-slate-400'
-                    }`}
-                  >
-                    <div className="font-bold">A Yüzü</div>
-                    <div className="text-[10px] opacity-75">Oyuna yeni başladım</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMetropolisSide('B')}
-                    className={`py-2 px-2 rounded-xl text-xs font-semibold border transition text-left ${
-                      metropolisSide === 'B'
-                        ? 'border-amber-500 bg-amber-950/40 text-amber-300'
-                        : 'border-slate-800 bg-slate-900 text-slate-400'
-                    }`}
-                  >
-                    <div className="font-bold">B Yüzü</div>
-                    <div className="text-[10px] opacity-75">Daha önce oynadım</div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tur Zamanlayıcısı */}
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Tur Süresi</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { label: 'Süresiz', val: null },
-                    { label: '60s', val: 60 },
-                    { label: '90s', val: 90 },
-                    { label: '120s', val: 120 },
-                  ].map((item) => (
                     <button
-                      key={item.label}
                       type="button"
-                      onClick={() => setTurnTimer(item.val)}
-                      className={`py-1.5 rounded-lg text-xs font-semibold border transition ${
-                        turnTimer === item.val
-                          ? 'border-amber-500 bg-amber-950/40 text-amber-300'
-                          : 'border-slate-800 bg-slate-900 text-slate-400'
+                      onClick={() => setMetropolisSide('B')}
+                      className={`p-3 rounded-2xl text-left border transition ${
+                        metropolisSide === 'B'
+                          ? 'border-amber-500 bg-amber-500/10 text-amber-300'
+                          : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
                       }`}
                     >
-                      {item.label}
+                      <div className="text-xs font-bold flex items-center gap-1.5">
+                        <Sparkles size={14} /> B Tarafı (Özel)
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        Yol & ordu eşitlik avantajları
+                      </div>
                     </button>
-                  ))}
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={loading}
-                className="w-full py-3 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-extrabold rounded-xl transition shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2"
-              >
-                <PlusCircle size={18} />
-                <span>{loading ? 'Oda Açılıyor...' : 'Oda Oluştur'}</span>
-              </button>
-            </div>
+                {/* Tur Süresi */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Tur Başına Süre
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: 'Süresiz', val: null },
+                      { label: '60 sn', val: 60 },
+                      { label: '90 sn', val: 90 },
+                      { label: '120 sn', val: 120 },
+                    ].map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => setTurnTimer(item.val)}
+                        className={`py-2.5 rounded-xl text-xs font-semibold border transition ${
+                          turnTimer === item.val
+                            ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-bold'
+                            : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={loading}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black rounded-2xl text-sm transition shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2"
+                >
+                  <PlusCircle size={18} />
+                  <span>{loading ? 'Oda Kuruluyor...' : 'Odayı Kur ve Başla'}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </main>
+
+      {/* ALT BİLGİ & SÜRÜM */}
+      <footer className="text-center text-xs text-slate-500 py-4 z-10 flex items-center gap-2">
+        <Shield size={12} className="text-amber-500/70" />
+        <span>Catan: On the Road v1.0 · Ponytail Edition</span>
+      </footer>
     </div>
   );
 };
