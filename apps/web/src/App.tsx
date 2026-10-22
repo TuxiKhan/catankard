@@ -8,7 +8,7 @@ import { Lobby } from './components/Lobby.tsx';
 import { RobberModal } from './components/RobberModal.tsx';
 import { TradeModal } from './components/TradeModal.tsx';
 import { getCardDetails, type CardDetails } from './lib/cardImages.ts';
-import { ensureAnonymousAuth, supabase } from './lib/supabase.ts';
+import { ensureAnonymousAuth, invokeEdgeFunction, supabase } from './lib/supabase.ts';
 
 export const App: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
@@ -23,6 +23,7 @@ export const App: React.FC = () => {
   // Modallar
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [eventNotification, setEventNotification] = useState<string | null>(null);
 
   // 1. Anonim Oturum Başlatma
   useEffect(() => {
@@ -54,7 +55,6 @@ export const App: React.FC = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${roomId}` },
         () => {
-          // Oyuncu listesini yeniden çek
           fetchRoomPlayers(roomId);
         }
       )
@@ -73,7 +73,24 @@ export const App: React.FC = () => {
         },
         (payload: any) => {
           if (payload.new && payload.new.user_id === userId) {
-            setPlayerView(payload.new.view);
+            const nextView: PlayerView = payload.new.view;
+            setPlayerView(nextView);
+
+            // Yeni olay bildirim kontrolü
+            if (nextView.lastEvent) {
+              const eventMessages: Record<string, string> = {
+                robber: '🏴‍☠️ HIRSIZ! 7\'den fazla kaynağı olan tüm oyuncular elinin yarısını atıyor.',
+                solstice: '☀️ YENİ YIL! Her oyuncu 1 kaynak çekti ve olay destesi yeniden karıştırıldı.',
+                abundance: '🌾 BOLLUK! En Uzun Yol ve En Büyük Ordu\'ya sahip olmayanlar 2 kaynak kazandı.',
+                subsidy: '🎉 HASAT KUTLAMASI! Her oyuncu masadaki her köyü için 1 kaynak çekti.',
+                charity: '🤝 SADAKA! En çok zafer puanına sahip oyuncular en az puanlılara 1 kaynak veriyor.',
+              };
+              const msg = eventMessages[nextView.lastEvent];
+              if (msg) {
+                setEventNotification(msg);
+                setTimeout(() => setEventNotification(null), 7000);
+              }
+            }
           }
         }
       )
@@ -93,11 +110,33 @@ export const App: React.FC = () => {
     if (!roomId || !userId) return;
 
     const interval = setInterval(() => {
-      supabase.functions.invoke('heartbeat', { body: { roomId } }).catch(console.error);
+      invokeEdgeFunction('heartbeat', { roomId }).catch(() => {});
     }, 15000);
 
     return () => clearInterval(interval);
   }, [roomId, userId]);
+
+  // 4. Periyodik Tick (Süre dolduğunda otomatik tur geçişi ve karar çözümü)
+  useEffect(() => {
+    if (!roomId || !playerView || playerView.phase === 'finished') return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const isTurnExpired = playerView.turnDeadline && now >= playerView.turnDeadline;
+      const isDecisionExpired = playerView.pendingDecisions.some((d) => d.deadline <= now);
+
+      if (isTurnExpired || isDecisionExpired) {
+        // Süre doldu, backend'e hafif tick gönder
+        invokeEdgeFunction('game-action', { roomId, tick: true })
+          .then((res) => {
+            if (res.view) setPlayerView(res.view);
+          })
+          .catch(() => {});
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [roomId, playerView]);
 
   const fetchRoom = async (id: string) => {
     const { data } = await supabase.from('rooms').select('*').eq('id', id).single();
@@ -119,42 +158,33 @@ export const App: React.FC = () => {
     metropolisSide: 'A' | 'B';
     turnTimerSeconds: number | null;
   }) => {
-    const { data, error } = await supabase.functions.invoke('lobby', {
-      body: {
-        op: 'create_room',
-        name: playerName,
-        ...options,
-      },
+    const data = await invokeEdgeFunction<{ ok: boolean; roomId: string; code: string }>('lobby', {
+      op: 'create_room',
+      name: playerName,
+      ...options,
     });
-    if (error || !data?.ok) throw new Error(data?.message || 'Oda oluşturulamadı.');
     setRoomId(data.roomId);
   };
 
   const handleJoinRoom = async (code: string) => {
-    const { data, error } = await supabase.functions.invoke('lobby', {
-      body: {
-        op: 'join_room',
-        code,
-        name: playerName,
-      },
+    const data = await invokeEdgeFunction<{ ok: boolean; roomId: string }>('lobby', {
+      op: 'join_room',
+      code,
+      name: playerName,
     });
-    if (error || !data?.ok) throw new Error(data?.message || 'Odaya katılınamadı.');
     setRoomId(data.roomId);
   };
 
   const handleStartGame = async () => {
     if (!roomId) return;
-    const { data, error } = await supabase.functions.invoke('lobby', {
-      body: { op: 'start_game', roomId },
-    });
-    if (error || !data?.ok) throw new Error(data?.message || 'Oyun başlatılamadı.');
+    await invokeEdgeFunction('lobby', { op: 'start_game', roomId });
   };
 
   const handleLeaveRoom = async () => {
     if (!roomId) return;
-    await supabase.functions.invoke('lobby', {
-      body: { op: 'leave_room', roomId },
-    });
+    try {
+      await invokeEdgeFunction('lobby', { op: 'leave_room', roomId });
+    } catch {}
     setRoomId(null);
     setRoom(null);
     setPlayers([]);
@@ -164,15 +194,16 @@ export const App: React.FC = () => {
   // Oyun Hamlesi İletme (Edge Function: game-action)
   const dispatchAction = async (action: Action) => {
     if (!roomId) return;
-    const { data, error } = await supabase.functions.invoke('game-action', {
-      body: { roomId, action },
-    });
-    if (error || !data?.ok) {
-      alert(data?.message || 'Hamle gerçekleştirilemedi.');
-      return;
-    }
-    if (data.view) {
-      setPlayerView(data.view);
+    try {
+      const data = await invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('game-action', {
+        roomId,
+        action,
+      });
+      if (data.view) {
+        setPlayerView(data.view);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Hamle gerçekleştirilemedi.');
     }
   };
 
@@ -184,7 +215,20 @@ export const App: React.FC = () => {
   const isGameActive = room?.status === 'playing' && playerView;
 
   return (
-    <div>
+    <div className="relative min-h-screen bg-slate-950">
+      {/* Olay Bildirimi Banner'ı */}
+      {eventNotification && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-2xl border-2 border-amber-300 animate-in slide-in-from-top duration-300 flex items-center gap-3 max-w-xl text-center">
+          <span className="text-sm md:text-base">{eventNotification}</span>
+          <button
+            onClick={() => setEventNotification(null)}
+            className="text-xs bg-slate-950/20 hover:bg-slate-950/40 text-slate-950 px-2 py-1 rounded-lg font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {!isGameActive ? (
         <Lobby
           currentUserId={userId}
@@ -203,10 +247,11 @@ export const App: React.FC = () => {
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}
           onEndTurn={() => dispatchAction({ type: 'end_turn' })}
-          onBuild={(cardId, source, onStackId) =>
+          onBuild={(cardId, source, onStackId, substitution) =>
             dispatchAction({
               type: 'build',
               target: source === 'row' ? { source: 'row', cardId, onStackId } : { source: 'metropolis', cardId, onStackId: onStackId! },
+              substitution,
             })
           }
           onLeaveGame={handleLeaveRoom}
@@ -217,10 +262,11 @@ export const App: React.FC = () => {
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}
           onEndTurn={() => dispatchAction({ type: 'end_turn' })}
-          onBuild={(cardId, source, onStackId) =>
+          onBuild={(cardId, source, onStackId, substitution) =>
             dispatchAction({
               type: 'build',
               target: source === 'row' ? { source: 'row', cardId, onStackId } : { source: 'metropolis', cardId, onStackId: onStackId! },
+              substitution,
             })
           }
           onLeaveGame={handleLeaveRoom}

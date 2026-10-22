@@ -4,11 +4,10 @@ import {
   CheckCircle2,
   Clock,
   LogOut,
-  RefreshCw,
-  Trophy,
 } from 'lucide-react';
-import type { BuildingCard, MetropolisCard, PlayerView } from '@catankard/engine';
+import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRow } from './BuildingRow.tsx';
+import { BuildModal } from './BuildModal.tsx';
 import { PlayerDesk } from './PlayerDesk.tsx';
 
 interface GameDesk3PProps {
@@ -16,7 +15,12 @@ interface GameDesk3PProps {
   onInspectCard: (type: any, subKind?: any) => void;
   onOpenTrade: () => void;
   onEndTurn: () => Promise<void>;
-  onBuild: (cardId: string, source: 'row' | 'metropolis', onStackId?: string) => Promise<void>;
+  onBuild: (
+    cardId: string,
+    source: 'row' | 'metropolis',
+    onStackId?: string,
+    substitution?: { replace: Resource; pay: Resource }
+  ) => Promise<void>;
   onLeaveGame: () => void;
 }
 
@@ -29,11 +33,18 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
   onLeaveGame,
 }) => {
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
+  const [buildTargetCard, setBuildTargetCard] = useState<{
+    card: BuildingCard | MetropolisCard;
+    source: 'row' | 'metropolis';
+  } | null>(null);
+
   const [pendingUpgrade, setPendingUpgrade] = useState<{
     cardId: string;
     source: 'row' | 'metropolis';
     type: 'city' | 'metropolis';
+    substitution?: { replace: Resource; pay: Resource };
   } | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
@@ -44,29 +55,43 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
     : null;
 
-  const handleBuildFromRow = async (card: BuildingCard) => {
-    if (card.type === 'city') {
-      setPendingUpgrade({ cardId: card.id, source: 'row', type: 'city' });
+  // İnşaat butonuna basılınca BuildModal'ı aç
+  const handleSelectBuild = (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
+    setBuildTargetCard({ card, source });
+  };
+
+  // BuildModal'da "İnşa Et" onaylanınca
+  const handleConfirmBuildModal = async (substitution?: { replace: Resource; pay: Resource }) => {
+    if (!buildTargetCard) return;
+    const { card, source } = buildTargetCard;
+    const cardType = source === 'row' ? (card as BuildingCard).type : 'metropolis';
+
+    if (cardType === 'city' || cardType === 'metropolis') {
+      // Önce hedef köy/şehir seçimi beklenir
+      setPendingUpgrade({
+        cardId: card.id,
+        source,
+        type: cardType,
+        substitution,
+      });
       return;
     }
 
-    try {
-      setLoading(true);
-      await onBuild(card.id, 'row');
-    } finally {
-      setLoading(false);
-    }
+    // Yol veya Köy veya Şövalye doğrudan inşa edilir
+    await onBuild(card.id, source, undefined, substitution);
   };
 
-  const handleBuildMetropolis = async (metro: MetropolisCard) => {
-    setPendingUpgrade({ cardId: metro.id, source: 'metropolis', type: 'metropolis' });
-  };
-
+  // Şehir veya Büyükşehir için hedef stack seçilince
   const handleConfirmUpgrade = async (stackId: string) => {
     if (!pendingUpgrade) return;
     try {
       setLoading(true);
-      await onBuild(pendingUpgrade.cardId, pendingUpgrade.source, stackId);
+      await onBuild(
+        pendingUpgrade.cardId,
+        pendingUpgrade.source,
+        stackId,
+        pendingUpgrade.substitution
+      );
       setPendingUpgrade(null);
       setSelectedStackId(null);
     } finally {
@@ -145,9 +170,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           <BuildingRow
             view={view}
             onInspectCard={onInspectCard}
-            onBuildFromRow={handleBuildFromRow}
-            onBuildMetropolis={handleBuildMetropolis}
-            canBuildCardId={() => isActive}
+            onSelectBuild={handleSelectBuild}
             canBuildMetropolis={isActive}
           />
         </div>
@@ -200,6 +223,17 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           </div>
         </div>
       </div>
+
+      {/* İnşaat & Yol İkamesi Modalı */}
+      {buildTargetCard && (
+        <BuildModal
+          card={buildTargetCard.card}
+          source={buildTargetCard.source}
+          view={view}
+          onClose={() => setBuildTargetCard(null)}
+          onConfirm={handleConfirmBuildModal}
+        />
+      )}
     </div>
   );
 };

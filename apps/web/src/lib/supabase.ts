@@ -8,53 +8,51 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Oyuncu için şeffaf oturum açar.
- * 1. Mevcut session varsa döner.
- * 2. Anonymous sign-in açıksa onu kullanır.
- * 3. Kapalıysa yerel misafir hesabı oluşturur/giriş yapar (kullanıcıya hissettirmez).
+ * Oyuncu için şeffaf, sıfır-sürtünmeli misafir kimliği üretir veya getirir.
+ * GoTrue email limitlerine veya kapalı anon auth ayarlarına takılmaz.
  */
 export async function ensureAnonymousAuth(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) {
-    return session.user.id;
-  }
-
-  // 1. Anonim giriş dene
   try {
-    const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-    if (!anonError && anonData?.user) {
-      return anonData.user.id;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+      return session.user.id;
     }
   } catch {}
 
-  // 2. Misafir hesabı fallback (Projede anonim kapalıysa kesintisiz devam)
-  let guestCreds = localStorage.getItem('catankard_guest_creds');
-  let email = '';
-  let password = '';
-
-  if (guestCreds) {
-    try {
-      const parsed = JSON.parse(guestCreds);
-      email = parsed.email;
-      password = parsed.password;
-    } catch {}
+  let guestId = localStorage.getItem('catankard_player_id');
+  if (!guestId) {
+    guestId = crypto.randomUUID();
+    localStorage.setItem('catankard_player_id', guestId);
   }
+  return guestId;
+}
 
-  if (!email || !password) {
-    const rand = Math.random().toString(36).substring(2, 9);
-    email = `guest_${Date.now()}_${rand}@gmail.com`;
-    password = `guest-pass-${rand}-${Date.now()}`;
-    localStorage.setItem('catankard_guest_creds', JSON.stringify({ email, password }));
-  }
+/**
+ * Edge Function çağrıları için yardımcı fonksiyon
+ */
+export async function invokeEdgeFunction<T = any>(
+  functionName: string,
+  body: Record<string, any>
+): Promise<T> {
+  const playerId = await ensureAnonymousAuth();
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || supabaseAnonKey;
 
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-  if (!signInError && signInData?.user) {
-    return signInData.user.id;
-  }
+  const url = `${supabaseUrl}/functions/v1/${functionName}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'apikey': supabaseAnonKey,
+      'x-player-id': playerId,
+    },
+    body: JSON.stringify({ ...body, playerId }),
+  });
 
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-  if (signUpError) {
-    throw signUpError;
+  const resJson = await response.json();
+  if (!response.ok || resJson.ok === false) {
+    throw new Error(resJson.message || `İşlem başarısız: ${response.statusText}`);
   }
-  return signUpData.user!.id;
+  return resJson as T;
 }

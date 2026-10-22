@@ -5,8 +5,9 @@ import {
   Clock,
   LogOut,
 } from 'lucide-react';
-import type { BuildingCard, MetropolisCard, PlayerView } from '@catankard/engine';
+import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRow } from './BuildingRow.tsx';
+import { BuildModal } from './BuildModal.tsx';
 import { PlayerDesk } from './PlayerDesk.tsx';
 
 interface GameDesk4PProps {
@@ -14,7 +15,12 @@ interface GameDesk4PProps {
   onInspectCard: (type: any, subKind?: any) => void;
   onOpenTrade: () => void;
   onEndTurn: () => Promise<void>;
-  onBuild: (cardId: string, source: 'row' | 'metropolis', onStackId?: string) => Promise<void>;
+  onBuild: (
+    cardId: string,
+    source: 'row' | 'metropolis',
+    onStackId?: string,
+    substitution?: { replace: Resource; pay: Resource }
+  ) => Promise<void>;
   onLeaveGame: () => void;
 }
 
@@ -27,11 +33,18 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   onLeaveGame,
 }) => {
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
+  const [buildTargetCard, setBuildTargetCard] = useState<{
+    card: BuildingCard | MetropolisCard;
+    source: 'row' | 'metropolis';
+  } | null>(null);
+
   const [pendingUpgrade, setPendingUpgrade] = useState<{
     cardId: string;
     source: 'row' | 'metropolis';
     type: 'city' | 'metropolis';
+    substitution?: { replace: Resource; pay: Resource };
   } | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
@@ -41,28 +54,38 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
     : null;
 
-  const handleBuildFromRow = async (card: BuildingCard) => {
-    if (card.type === 'city') {
-      setPendingUpgrade({ cardId: card.id, source: 'row', type: 'city' });
-      return;
-    }
-    try {
-      setLoading(true);
-      await onBuild(card.id, 'row');
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectBuild = (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
+    setBuildTargetCard({ card, source });
   };
 
-  const handleBuildMetropolis = async (metro: MetropolisCard) => {
-    setPendingUpgrade({ cardId: metro.id, source: 'metropolis', type: 'metropolis' });
+  const handleConfirmBuildModal = async (substitution?: { replace: Resource; pay: Resource }) => {
+    if (!buildTargetCard) return;
+    const { card, source } = buildTargetCard;
+    const cardType = source === 'row' ? (card as BuildingCard).type : 'metropolis';
+
+    if (cardType === 'city' || cardType === 'metropolis') {
+      setPendingUpgrade({
+        cardId: card.id,
+        source,
+        type: cardType,
+        substitution,
+      });
+      return;
+    }
+
+    await onBuild(card.id, source, undefined, substitution);
   };
 
   const handleConfirmUpgrade = async (stackId: string) => {
     if (!pendingUpgrade) return;
     try {
       setLoading(true);
-      await onBuild(pendingUpgrade.cardId, pendingUpgrade.source, stackId);
+      await onBuild(
+        pendingUpgrade.cardId,
+        pendingUpgrade.source,
+        stackId,
+        pendingUpgrade.substitution
+      );
       setPendingUpgrade(null);
       setSelectedStackId(null);
     } finally {
@@ -104,6 +127,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       </header>
 
+      {/* Yükseltme Seçim Uyarısı */}
       {pendingUpgrade && (
         <div className="bg-amber-950/80 border-2 border-amber-500 rounded-xl p-3 mb-4 flex items-center justify-between animate-pulse">
           <span className="text-sm text-amber-200">
@@ -119,9 +143,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       )}
 
-      {/* 4 Oyunculu Grid: 3 Rakip Üstte/Yanlarda */}
+      {/* 4 Oyuncu Masası: Üstte 3 Rakip Oyuncu */}
       <div className="flex-1 flex flex-col justify-between gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {opponents.map((pid) => (
             <PlayerDesk
               key={pid}
@@ -133,17 +157,17 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           ))}
         </div>
 
+        {/* Ortada Building Row */}
         <div className="my-auto">
           <BuildingRow
             view={view}
             onInspectCard={onInspectCard}
-            onBuildFromRow={handleBuildFromRow}
-            onBuildMetropolis={handleBuildMetropolis}
-            canBuildCardId={() => isActive}
+            onSelectBuild={handleSelectBuild}
             canBuildMetropolis={isActive}
           />
         </div>
 
+        {/* Altta Kullanıcının Kendi Masası ve Aksiyon Barı */}
         <div className="space-y-3">
           <PlayerDesk
             playerId={view.you}
@@ -156,36 +180,51 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           />
 
           <div className="flex items-center justify-between bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 shadow-xl">
-            <button
-              onClick={onOpenTrade}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl text-sm transition shadow-lg"
-            >
-              <ArrowRightLeft size={16} />
-              <span>Ticaret / Takas</span>
-              {view.tradeOffers.filter((o) => o.status === 'open').length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                  {view.tradeOffers.filter((o) => o.status === 'open').length}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenTrade}
+                className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl text-sm transition shadow-lg"
+              >
+                <ArrowRightLeft size={16} />
+                <span>Ticaret / Takas</span>
+                {view.tradeOffers.filter((o) => o.status === 'open').length > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {view.tradeOffers.filter((o) => o.status === 'open').length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {isActive ? (
+                <button
+                  onClick={onEndTurn}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold rounded-xl text-sm transition shadow-lg shadow-emerald-900/40"
+                >
+                  <CheckCircle2 size={18} />
+                  <span>Turu Bitir</span>
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400 italic">
+                  Sıradaki oyuncunun hamlesi bekleniyor...
                 </span>
               )}
-            </button>
-
-            {isActive ? (
-              <button
-                onClick={onEndTurn}
-                disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold rounded-xl text-sm transition shadow-lg shadow-emerald-900/40"
-              >
-                <CheckCircle2 size={18} />
-                <span>Turu Bitir</span>
-              </button>
-            ) : (
-              <span className="text-xs text-slate-400 italic">
-                Sıradaki oyuncunun hamlesi bekleniyor...
-              </span>
-            )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* İnşaat & Yol İkamesi Modalı */}
+      {buildTargetCard && (
+        <BuildModal
+          card={buildTargetCard.card}
+          source={buildTargetCard.source}
+          view={view}
+          onClose={() => setBuildTargetCard(null)}
+          onConfirm={handleConfirmBuildModal}
+        />
+      )}
     </div>
   );
 };

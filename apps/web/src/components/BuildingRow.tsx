@@ -9,21 +9,18 @@ import {
 interface BuildingRowProps {
   view: PlayerView;
   onInspectCard: (type: any, subKind?: any) => void;
-  onBuildFromRow: (card: BuildingCard) => void;
-  onBuildMetropolis: (metro: MetropolisCard) => void;
-  canBuildCardId: (cardId: string) => boolean;
+  onSelectBuild: (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => void;
   canBuildMetropolis: boolean;
 }
 
 export const BuildingRow: React.FC<BuildingRowProps> = ({
   view,
   onInspectCard,
-  onBuildFromRow,
-  onBuildMetropolis,
-  canBuildCardId,
+  onSelectBuild,
   canBuildMetropolis,
 }) => {
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
+  const topMetro = view.metropolisStack.length > 0 ? view.metropolisStack[0] : null;
 
   return (
     <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-4 shadow-2xl backdrop-blur-md">
@@ -79,13 +76,12 @@ export const BuildingRow: React.FC<BuildingRowProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         {/* 5 Building Row Kartı */}
         {view.buildingRow.map((card) => {
-          const canBuild = isActive && canBuildCardId(card.id);
           return (
             <div
               key={card.id}
               className={`relative rounded-xl border-2 p-2 flex flex-col items-center justify-between transition-all group ${
-                canBuild
-                  ? 'border-amber-500 bg-slate-800/90 shadow-amber-500/20 shadow-lg hover:scale-105'
+                isActive
+                  ? 'border-amber-500/70 bg-slate-800/90 shadow-amber-500/10 shadow-lg hover:border-amber-400 hover:scale-[1.02]'
                   : 'border-slate-700 bg-slate-800/50 opacity-90'
               }`}
             >
@@ -100,10 +96,10 @@ export const BuildingRow: React.FC<BuildingRowProps> = ({
                 />
               </div>
 
-              {canBuild ? (
+              {isActive ? (
                 <button
                   type="button"
-                  onClick={() => onBuildFromRow(card)}
+                  onClick={() => onSelectBuild(card, 'row')}
                   className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition shadow"
                 >
                   İnşa Et
@@ -122,57 +118,53 @@ export const BuildingRow: React.FC<BuildingRowProps> = ({
         })}
 
         {/* Büyükşehir Yığını (Metropolis Stack) */}
-        {view.metropolisStack.length > 0 ? (
-          (() => {
-            const topMetro = view.metropolisStack[0]!;
-            const canBuild = isActive && canBuildMetropolis;
+        {topMetro ? (
+          <div
+            className={`relative rounded-xl border-2 p-2 flex flex-col items-center justify-between transition-all group ${
+              canBuildMetropolis && isActive
+                ? 'border-yellow-500 bg-slate-800/90 shadow-yellow-500/20 shadow-lg hover:scale-[1.02]'
+                : 'border-slate-700 bg-slate-800/50 opacity-90'
+            }`}
+          >
+            <div
+              onClick={() =>
+                onInspectCard('metropolis', topMetro.kind)
+              }
+              className="w-full h-36 flex items-center justify-center cursor-pointer mb-2 relative"
+            >
+              <img
+                src={getMetropolisImageUrl(topMetro)}
+                alt="Büyükşehir"
+                className="w-full h-full object-contain filter drop-shadow"
+              />
+              <span className="absolute top-1 right-1 bg-yellow-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow">
+                x{view.metropolisStack.length}
+              </span>
+            </div>
 
-            return (
-              <div
-                className={`relative rounded-xl border-2 p-2 flex flex-col items-center justify-between transition-all ${
-                  canBuild
-                    ? 'border-purple-500 bg-slate-800/90 shadow-purple-500/20 shadow-lg hover:scale-105'
-                    : 'border-purple-900/60 bg-slate-800/40'
-                }`}
+            {canBuildMetropolis && isActive ? (
+              <button
+                type="button"
+                onClick={() => onSelectBuild(topMetro, 'metropolis')}
+                className="w-full py-1.5 bg-yellow-500 hover:bg-yellow-400 active:bg-yellow-600 text-slate-950 font-bold rounded-lg text-xs transition shadow"
               >
-                <div className="absolute top-1 right-2 bg-purple-900/90 text-purple-200 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-purple-500">
-                  {view.metropolisStack.length} kaldı
-                </div>
-
-                <div
-                  onClick={() => onInspectCard('metropolis', topMetro.kind)}
-                  className="w-full h-36 flex items-center justify-center cursor-pointer mb-2"
-                >
-                  <img
-                    src={getMetropolisImageUrl(topMetro)}
-                    alt="Büyükşehir"
-                    className="w-full h-full object-contain filter drop-shadow"
-                  />
-                </div>
-
-                {canBuild ? (
-                  <button
-                    type="button"
-                    onClick={() => onBuildMetropolis(topMetro)}
-                    className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs transition shadow"
-                  >
-                    Büyükşehir Kur
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onInspectCard('metropolis', topMetro.kind)}
-                    className="w-full py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
-                  >
-                    İncele ({topMetro.side})
-                  </button>
-                )}
-              </div>
-            );
-          })()
+                Büyükşehir Kur
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  onInspectCard('metropolis', topMetro.kind)
+                }
+                className="w-full py-1.5 bg-slate-700/60 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
+              >
+                İncele
+              </button>
+            )}
+          </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-700 flex items-center justify-center p-3 text-slate-500 text-xs text-center">
-            Büyükşehirler Tükendi
+          <div className="rounded-xl border-2 border-dashed border-slate-800 p-2 flex flex-col items-center justify-center text-center text-xs text-slate-500">
+            <span>Büyükşehir Tükendi</span>
           </div>
         )}
       </div>

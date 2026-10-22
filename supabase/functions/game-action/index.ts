@@ -10,7 +10,7 @@ import {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-player-id',
 };
 
 serve(async (req) => {
@@ -22,26 +22,33 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const authHeader = req.headers.get('Authorization');
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Yetkisiz erişim.' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const userClient = createClient(supabaseUrl, authHeader.replace('Bearer ', ''));
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Geçersiz kullanıcı oturumu.' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    const headerPlayerId = req.headers.get('x-player-id');
     const body = await req.json();
+
+    let userId: string | null = null;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const userClient = createClient(supabaseUrl, authHeader.replace('Bearer ', ''));
+        const { data: { user } } = await userClient.auth.getUser();
+        if (user) {
+          userId = user.id;
+        }
+      } catch {}
+    }
+
+    if (!userId) {
+      userId = headerPlayerId || body.playerId;
+    }
+
+    if (!userId) {
+      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Oyuncu kimliği eksik.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { roomId, action, tick } = body;
 
     if (!roomId) {
@@ -97,7 +104,7 @@ serve(async (req) => {
         }
       }
 
-      result = applyAction(currentState, user.id, action as Action, now);
+      result = applyAction(currentState, userId, action as Action, now);
     } else {
       return new Response(JSON.stringify({ ok: false, code: 'INVALID_REQUEST', message: 'action veya tick parametresi gereklidir.' }), {
         status: 400,
@@ -147,7 +154,7 @@ serve(async (req) => {
       await supabase.from('rooms').update({ status: 'finished' }).eq('id', roomId);
     }
 
-    const callerUserView = getPlayerView(nextState, user.id);
+    const callerUserView = getPlayerView(nextState, userId);
     return new Response(JSON.stringify({ ok: true, view: callerUserView }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

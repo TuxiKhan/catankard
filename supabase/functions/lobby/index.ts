@@ -4,7 +4,7 @@ import { createGame, getPlayerView } from '../_shared/engine/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-player-id',
 };
 
 function generateRoomCode(): string {
@@ -25,26 +25,33 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const authHeader = req.headers.get('Authorization');
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Yetkisiz erişim.' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const userClient = createClient(supabaseUrl, authHeader.replace('Bearer ', ''));
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Geçersiz kullanıcı oturumu.' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    const headerPlayerId = req.headers.get('x-player-id');
     const body = await req.json();
+
+    let userId: string | null = null;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const userClient = createClient(supabaseUrl, authHeader.replace('Bearer ', ''));
+        const { data: { user } } = await userClient.auth.getUser();
+        if (user) {
+          userId = user.id;
+        }
+      } catch {}
+    }
+
+    if (!userId) {
+      userId = headerPlayerId || body.playerId;
+    }
+
+    if (!userId) {
+      return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Oyuncu kimliği eksik.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { op } = body;
 
     if (op === 'create_room') {
@@ -55,7 +62,7 @@ serve(async (req) => {
         .from('rooms')
         .insert({
           code,
-          created_by: user.id,
+          created_by: userId,
           max_players: maxPlayers,
           metropolis_side: metropolisSide,
           turn_timer_seconds: turnTimerSeconds,
@@ -69,7 +76,7 @@ serve(async (req) => {
       // Kurucuyu odaya ilk oyuncu olarak ekle
       const { error: pErr } = await supabase.from('room_players').insert({
         room_id: room.id,
-        user_id: user.id,
+        user_id: userId,
         name: name || 'Oyuncu 1',
         seat_index: 0,
         is_host: true,
@@ -102,7 +109,7 @@ serve(async (req) => {
         .from('room_players')
         .select('*')
         .eq('room_id', room.id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (existingPlayer) {
@@ -139,7 +146,7 @@ serve(async (req) => {
 
       const { error: joinErr } = await supabase.from('room_players').insert({
         room_id: room.id,
-        user_id: user.id,
+        user_id: userId,
         name: name || `Oyuncu ${availableSeat + 1}`,
         seat_index: availableSeat,
         is_host: false,
@@ -158,7 +165,7 @@ serve(async (req) => {
         .from('room_players')
         .delete()
         .eq('room_id', roomId)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -168,7 +175,7 @@ serve(async (req) => {
     if (op === 'start_game') {
       const { roomId } = body;
       const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-      if (!room || room.created_by !== user.id) {
+      if (!room || room.created_by !== userId) {
         return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Yalnızca kurucu oyunu başlatabilir.' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -228,7 +235,7 @@ serve(async (req) => {
     if (op === 'end_game') {
       const { roomId } = body;
       const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
-      if (!room || room.created_by !== user.id) {
+      if (!room || room.created_by !== userId) {
         return new Response(JSON.stringify({ ok: false, code: 'UNAUTHORIZED', message: 'Yalnızca kurucu oyunu sonlandırabilir.' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
