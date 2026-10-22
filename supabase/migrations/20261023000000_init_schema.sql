@@ -2,6 +2,10 @@
 -- Mimari sözleşmesi: docs/ARCHITECTURE.md
 
 -- Eski tablolar varsa temizle
+drop table if exists public.trades cascade;
+drop table if exists public.card_market cascade;
+drop table if exists public.decks cascade;
+drop table if exists public.player_hands cascade;
 drop table if exists public.player_views cascade;
 drop table if exists public.game_states cascade;
 drop table if exists public.room_players cascade;
