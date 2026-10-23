@@ -3,9 +3,10 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 4 – Entegrasyon Tamamlandı & E2E Hazırlığı
+- **Aşama:** STEP 5 – Fiziksel Masa & Masaüstü Deneyimi Tamamlandı, Dev & Test Aktif
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
 - **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1
+- **Canlı Test:** `http://localhost:5173/`
 - **Son güncelleme:** 2026-10-23
 
 ## Kaynak Materyal
@@ -15,7 +16,7 @@
 | Kural kitabı (PDF) | `CN3143 CATAN – On the Road Rulebook.pdf` | Orijinal resmi kural kitapçığı |
 | **Kural spesifikasyonu** | `docs/RULES_SPEC.md` | v1.0 Orijinal PDF ile %100 doğrulanmış nihai kural belgesi |
 | **Mimari & API sözleşmesi** | `docs/ARCHITECTURE.md` + `packages/engine/src/types.ts` | Ajanlar arası ortak arayüz |
-| Masa düzenleri | `masa-md/` (+ `masa/` PNG) | 3 ve 4 oyunculu masa düzenleri referansı |
+| Masa düzenleri & Hedef Renderlar | `masa/` + `catan 4 player game main desk.png` vb. | Bordo çuha masa, yelpaze el, bina tepsisi referansları |
 | Kart tanımları (TR) | `catan_on_the_road_cards - Türkçe md/` (+ PNG) | UI'da kullanılan kart yüzü görselleri |
 
 ## Yol Haritası
@@ -23,11 +24,17 @@
 - [x] GitHub public repo oluşturuldu ve push edildi
 - [x] Orijinal `CN3143 CATAN – On the Road Rulebook.pdf` incelendi ve `docs/RULES_SPEC.md` eksiksiz güncellendi (v1.0)
 - [x] Sub-Agent 2: Oyun Motoru (`packages/engine`) — deterministik PRNG, tam kural seti, 15 vitest testi (%100 başarı)
-- [x] Sub-Agent 1: Backend & DB (`supabase/`) — PostgreSQL şeması, RLS politikaları, Realtime yayını, `lobby`, `game-action`, `heartbeat` Edge Function'ları
-- [x] Sub-Agent 3: Frontend UI (`apps/web`) — React + Vite + Tailwind CSS, 3 ve 4 oyunculu masa düzeni, kart inceleme, ticaret modalı, hırsız/sadaka modalları, production build doğrulandı
-- [x] 3 dal (`feat/engine`, `feat/backend`, `feat/frontend`) `main` dalına entegre edildi ve GitHub'a push edildi
-- [ ] Supabase Edge Function deploy & SQL migration uygulama
-- [ ] 3 ve 4 oyunculu simülasyon / E2E doğrulama
+- [x] Sub-Agent 1: Backend & DB (`supabase/`) — PostgreSQL şeması, RLS & anon izinleri, `lobby`, `game-action`, `heartbeat` Edge Function'ları deploy edildi (ACTIVE)
+- [x] Sub-Agent 3: Frontend UI (`apps/web`) — Sade, modern Catan lobisi, modern PIN oda kodu girişi, parti modu misafir UUID kimlik doğrulaması
+- [x] Fiziksel Oyun Masası & Çuha Mat Redesign (`apps/web`):
+  - Bordo radial çuha dokusu (`#700913`), beyaz kesik çizgili kadranlar ve retro "masa" orta damgası (`GameMat.tsx`)
+  - Beyaz çerçeveli orta bina dizisi tepsisi (`BuildingRowMat.tsx`), 5 açık bina yuvası, kapalı bina, kaynak ve olay desteleri, metropol ve kupa kartları
+  - Gerçekçi açılı yelpaze el dizilimi (`FannedHand.tsx`), hover yükselmesi, rakiplerin kapalı arkalık yelpazeleri
+  - Dikey ofsetli kart istifleme: Köy -> Şehir -> Büyükşehir dikey 28px kaydırma (`CardStack.tsx`)
+  - Çift altın çerçeveli parşömen kart inceleme modalı (`CardModal.tsx`)
+- [x] 3 ve 4 oyunculu masa düzenleri (`GameDesk3P.tsx`, `GameDesk4P.tsx`)
+- [x] Vite prodüksiyon derlemesi (0 hata) ve canlı dev sunucusu (`http://localhost:5173/`)
+- [ ] 3 ve 4 oyunculu çoklu sekme canlı maç testi ve kullanıcı kabulü
 
 ## Tamamlanan Detaylar (PDF Doğrulaması)
 1. **Oyuncu Yardım Kartları**: 4 adet çift yüzlü yardım kartı bileşenlere eklendi.
