@@ -4,11 +4,15 @@ import {
   CheckCircle2,
   Clock,
   LogOut,
+  Shield,
+  Milestone,
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
-import { BuildingRow } from './BuildingRow.tsx';
+import { BuildingRowMat } from './BuildingRowMat.tsx';
 import { BuildModal } from './BuildModal.tsx';
-import { PlayerDesk } from './PlayerDesk.tsx';
+import { CardStack } from './CardStack.tsx';
+import { FannedHand } from './FannedHand.tsx';
+import { GameMat } from './GameMat.tsx';
 
 interface GameDesk4PProps {
   view: PlayerView;
@@ -49,6 +53,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
   const opponents = view.turnOrder.filter((id) => id !== view.you);
+  const opp1 = opponents[0]; // Sol Üst
+  const opp2 = opponents[1]; // Sağ Üst
+  const opp3 = opponents[2]; // Sol Alt
 
   const remainingSeconds = view.turnDeadline
     ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
@@ -93,129 +100,348 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     }
   };
 
+  const youPlayer = view.players[view.you];
+  const youArea = youPlayer?.area;
+  const youRoadRatio =
+    (youArea?.roads ?? 1) <= 1
+      ? '4:1'
+      : youArea?.roads === 2
+      ? '3:1'
+      : youArea?.roads === 3
+      ? '2:1'
+      : '1:1';
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-3 md:p-6 select-none">
-      <header className="flex items-center justify-between bg-slate-900/90 border border-slate-700/80 rounded-2xl px-5 py-3 mb-4 shadow-xl">
-        <div className="flex items-center gap-4">
-          <span className="font-extrabold text-amber-500 text-lg tracking-wider">
-            CATAN · ON THE ROAD (4 OYUNCU)
+    <div className="relative w-full min-h-screen bg-[#180103] flex flex-col justify-between overflow-hidden">
+      {/* 1. ÜST YÜZEN (FLOATING) MINIMAL OYUN BARI */}
+      <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-4 py-2 shadow-2xl flex items-center justify-between transition-all">
+        {/* Sol: Tur & Sıra */}
+        <div className="flex items-center gap-3">
+          <span className="font-black text-amber-500 text-sm tracking-wider uppercase hidden sm:inline">
+            Catan 4P • On the Road
           </span>
-          <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full text-xs text-slate-300">
-            <span>Tur #{view.turnNumber}</span>
-            <span className="text-slate-600">|</span>
-            <span>
-              Sıra: <strong className="text-amber-400">{view.players[view.activePlayerId]?.name}</strong>
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-full text-xs">
+            <span className="text-slate-400">Tur #{view.turnNumber}</span>
+            <span className="text-slate-600">•</span>
+            <span className="flex items-center gap-1.5 font-bold">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                }`}
+              />
+              <span className={isActive ? 'text-emerald-400' : 'text-amber-300'}>
+                {view.players[view.activePlayerId]?.name || 'Oyuncu'}
+              </span>
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Orta: Skor Tablosu (Tüm 4 Oyuncu) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {view.turnOrder.map((pid) => {
+            const p = view.players[pid];
+            if (!p) return null;
+            const isTurn = view.activePlayerId === pid;
+            const isMe = view.you === pid;
+            const hasRoute = view.longestRouteOwner === pid;
+            const hasArmy = view.largestArmyOwner === pid;
+
+            return (
+              <div
+                key={pid}
+                className={`flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl border text-[11px] sm:text-xs transition-all ${
+                  isTurn
+                    ? 'border-amber-400/90 bg-amber-950/60 text-amber-200 ring-1 ring-amber-400/40 font-bold'
+                    : 'border-slate-800 bg-slate-900/70 text-slate-300'
+                }`}
+              >
+                <span className="truncate max-w-[60px] sm:max-w-[75px]">
+                  {isMe ? 'Sen' : p.name}
+                </span>
+                <span className="font-black text-yellow-400 bg-black/40 px-1 py-0.2 rounded-md">
+                  {p.visibleVP} ZP
+                </span>
+                {hasRoute && <span title="En Uzun Yol (+2 ZP)">🛣️</span>}
+                {hasArmy && <span title="En Güçlü Ordu (+2 ZP)">⚔️</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sağ: Zamanlayıcı & Ayrıl Butonu */}
+        <div className="flex items-center gap-2">
           {remainingSeconds !== null && (
-            <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 px-3 py-1 rounded-full text-xs font-semibold text-amber-400">
-              <Clock size={14} />
+            <div
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                remainingSeconds <= 15
+                  ? 'border-red-500 bg-red-950/80 text-red-300 animate-pulse'
+                  : 'border-amber-600/50 bg-slate-900 text-amber-400'
+              }`}
+            >
+              <Clock size={13} />
               <span>{remainingSeconds}s</span>
             </div>
           )}
 
           <button
             onClick={onLeaveGame}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 p-2 rounded-lg bg-slate-800 hover:bg-slate-700/50 transition"
+            title="Masadan Ayrıl"
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-400 p-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 transition border border-slate-800"
           >
-            <LogOut size={16} />
-            <span className="hidden sm:inline">Ayrıl</span>
+            <LogOut size={15} />
+            <span className="hidden md:inline">Ayrıl</span>
           </button>
         </div>
       </header>
 
-      {/* Yükseltme Seçim Uyarısı */}
+      {/* Yükseltme Bildirim Çubuğu */}
       {pendingUpgrade && (
-        <div className="bg-amber-950/80 border-2 border-amber-500 rounded-xl p-3 mb-4 flex items-center justify-between animate-pulse">
-          <span className="text-sm text-amber-200">
-            Lütfen masanızdan yükseltmek istediğiniz{' '}
-            <strong>{pendingUpgrade.type === 'city' ? 'Köyü' : 'Şehri'}</strong> seçin!
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center gap-4 animate-bounce">
+          <span className="text-sm font-bold text-amber-200">
+            Masanızdan yükseltmek istediğiniz{' '}
+            <strong className="text-white uppercase underline">
+              {pendingUpgrade.type === 'city' ? 'Köyü' : 'Şehri'}
+            </strong>{' '}
+            seçin!
           </span>
           <button
             onClick={() => setPendingUpgrade(null)}
-            className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded-lg"
+            className="text-xs bg-slate-900 hover:bg-slate-800 text-amber-300 px-3 py-1 rounded-lg border border-amber-600/50 font-bold"
           >
             İptal
           </button>
         </div>
       )}
 
-      {/* 4 Oyuncu Masası: Üstte 3 Rakip Oyuncu */}
-      <div className="flex-1 flex flex-col justify-between gap-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {opponents.map((pid) => (
-            <PlayerDesk
-              key={pid}
-              playerId={pid}
-              view={view}
-              isCurrentPlayer={false}
-              onInspectCard={onInspectCard}
-            />
-          ))}
+      {/* 2. OYUN MATI (4 EKSENLİ KIRMIZI KADİFE ZEMİN) */}
+      <GameMat playerCount={4}>
+        {/* Üst Kadranlar (Sol Üst: Opp1, Sağ Üst: Opp2) */}
+        <div className="w-full grid grid-cols-2 gap-4 pt-10">
+          {/* Sol Üst Kadran */}
+          {opp1 && (
+            <div className="flex flex-col items-start gap-1.5 relative">
+              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-xs border border-white/10 px-2.5 py-1 rounded-lg text-xs">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    view.activePlayerId === opp1 ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
+                  }`}
+                />
+                <span className="font-bold text-slate-200">{view.players[opp1]?.name}</span>
+                <span className="text-[10px] text-yellow-400 font-bold bg-black/50 px-1 rounded">
+                  {view.players[opp1]?.visibleVP} ZP
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  🛣️ {view.players[opp1]?.area?.roads} | ⚔️ {view.players[opp1]?.area?.knights}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <FannedHand
+                  cardCount={view.players[opp1]?.handCount ?? 0}
+                  isCurrentPlayer={false}
+                  corner="top-left"
+                  scale={0.8}
+                />
+                <div className="flex flex-wrap gap-2 items-end max-w-[280px]">
+                  {view.players[opp1]?.area?.stacks.map((stack) => (
+                    <CardStack
+                      key={stack.id}
+                      stack={stack}
+                      onInspectCard={onInspectCard}
+                      scale={0.8}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sağ Üst Kadran */}
+          {opp2 && (
+            <div className="flex flex-col items-end gap-1.5 relative">
+              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-xs border border-white/10 px-2.5 py-1 rounded-lg text-xs">
+                <span className="text-[10px] text-slate-400">
+                  ⚔️ {view.players[opp2]?.area?.knights} | 🛣️ {view.players[opp2]?.area?.roads}
+                </span>
+                <span className="text-[10px] text-yellow-400 font-bold bg-black/50 px-1 rounded">
+                  {view.players[opp2]?.visibleVP} ZP
+                </span>
+                <span className="font-bold text-slate-200">{view.players[opp2]?.name}</span>
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    view.activePlayerId === opp2 ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-start gap-3 flex-row-reverse">
+                <FannedHand
+                  cardCount={view.players[opp2]?.handCount ?? 0}
+                  isCurrentPlayer={false}
+                  corner="top-right"
+                  scale={0.8}
+                />
+                <div className="flex flex-wrap gap-2 items-end justify-end max-w-[280px]">
+                  {view.players[opp2]?.area?.stacks.map((stack) => (
+                    <CardStack
+                      key={stack.id}
+                      stack={stack}
+                      onInspectCard={onInspectCard}
+                      scale={0.8}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Ortada Building Row */}
-        <div className="my-auto">
-          <BuildingRow
+        {/* Orta Alan: BUILDING ROW MAT */}
+        <div className="my-auto flex justify-center w-full z-10">
+          <BuildingRowMat
             view={view}
             onInspectCard={onInspectCard}
             onSelectBuild={handleSelectBuild}
             canBuildMetropolis={isActive}
+            scale={0.98}
           />
         </div>
 
-        {/* Altta Kullanıcının Kendi Masası ve Aksiyon Barı */}
-        <div className="space-y-3">
-          <PlayerDesk
-            playerId={view.you}
-            view={view}
-            isCurrentPlayer={true}
-            onInspectCard={onInspectCard}
-            onSelectStack={handleConfirmUpgrade}
-            selectedStackId={selectedStackId}
-            targetUpgradeType={pendingUpgrade?.type}
-          />
+        {/* Alt Kadranlar (Sol Alt: Opp3, Sağ Alt: SEN / Aktif Oyuncu) */}
+        <div className="w-full grid grid-cols-2 gap-4 pb-14">
+          {/* Sol Alt Kadran: Opp3 */}
+          {opp3 ? (
+            <div className="flex flex-col items-start gap-1.5 relative justify-end">
+              <div className="flex items-end gap-3">
+                <FannedHand
+                  cardCount={view.players[opp3]?.handCount ?? 0}
+                  isCurrentPlayer={false}
+                  corner="bottom-left"
+                  scale={0.8}
+                />
+                <div className="flex flex-wrap gap-2 items-end max-w-[280px]">
+                  {view.players[opp3]?.area?.stacks.map((stack) => (
+                    <CardStack
+                      key={stack.id}
+                      stack={stack}
+                      onInspectCard={onInspectCard}
+                      scale={0.8}
+                    />
+                  ))}
+                </div>
+              </div>
 
-          <div className="flex items-center justify-between bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 shadow-xl">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onOpenTrade}
-                className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl text-sm transition shadow-lg"
-              >
-                <ArrowRightLeft size={16} />
-                <span>Ticaret / Takas</span>
-                {view.tradeOffers.filter((o) => o.status === 'open').length > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {view.tradeOffers.filter((o) => o.status === 'open').length}
-                  </span>
-                )}
-              </button>
+              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-xs border border-white/10 px-2.5 py-1 rounded-lg text-xs">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    view.activePlayerId === opp3 ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
+                  }`}
+                />
+                <span className="font-bold text-slate-200">{view.players[opp3]?.name}</span>
+                <span className="text-[10px] text-yellow-400 font-bold bg-black/50 px-1 rounded">
+                  {view.players[opp3]?.visibleVP} ZP
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  🛣️ {view.players[opp3]?.area?.roads} | ⚔️ {view.players[opp3]?.area?.knights}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {/* Sağ Alt Kadran: SENİN MASAN (Stacks + Fanned Hand) */}
+          <div className="flex flex-col items-end gap-1.5 relative justify-end">
+            {/* Yerleşim Yığınları */}
+            <div className="flex flex-wrap gap-2.5 items-end justify-end max-w-md">
+              {youArea?.stacks.map((stack) => {
+                const isSettlement = stack.top === 'settlement';
+                const isCity = stack.top === 'city';
+
+                const canSelectForCity = pendingUpgrade?.type === 'city' && isSettlement;
+                const canSelectForMetro = pendingUpgrade?.type === 'metropolis' && isCity;
+                const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
+                const isSelected = selectedStackId === stack.id;
+
+                return (
+                  <CardStack
+                    key={stack.id}
+                    stack={stack}
+                    isSelectable={isSelectable}
+                    isSelected={isSelected}
+                    onSelect={handleConfirmUpgrade}
+                    onInspectCard={onInspectCard}
+                    scale={0.92}
+                  />
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-3">
-              {isActive ? (
-                <button
-                  onClick={onEndTurn}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold rounded-xl text-sm transition shadow-lg shadow-emerald-900/40"
-                >
-                  <CheckCircle2 size={18} />
-                  <span>Turu Bitir</span>
-                </button>
-              ) : (
-                <span className="text-xs text-slate-400 italic">
-                  Sıradaki oyuncunun hamlesi bekleniyor...
-                </span>
-              )}
+            {/* Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi */}
+            <div className="w-full flex justify-end -mt-1">
+              <FannedHand
+                hand={view.yourHand}
+                isCurrentPlayer={true}
+                corner="bottom-right"
+                onInspectCard={onInspectCard}
+                scale={1.0}
+              />
             </div>
           </div>
         </div>
-      </div>
+      </GameMat>
 
-      {/* İnşaat & Yol İkamesi Modalı */}
+      {/* 3. ALT YÜZEN (FLOATING) MINIMAL AKSİYON BARI */}
+      <footer className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center justify-between">
+        {/* Sol: Ticaret / Takas & Hızlı İstatistikler */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenTrade}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-lg border border-amber-400/40"
+          >
+            <ArrowRightLeft size={15} />
+            <span>Ticaret / Takas</span>
+            {view.tradeOffers.filter((o) => o.status === 'open').length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {view.tradeOffers.filter((o) => o.status === 'open').length}
+              </span>
+            )}
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-300 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-1" title="Yol Takas Oranı">
+              <Milestone size={13} className="text-amber-400" />
+              <span>Yollar ({youArea?.roads}): <strong>{youRoadRatio}</strong></span>
+            </div>
+            <span className="text-slate-700">|</span>
+            <div className="flex items-center gap-1" title="Şövalye Sayısı & Hırsız Koruma Limiti">
+              <Shield size={13} className="text-blue-400" />
+              <span>Şövalye: <strong>{youArea?.knights}</strong> (+{youArea?.knights} limit)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sağ: Turu Bitir */}
+        <div className="flex items-center gap-3">
+          {isActive ? (
+            <button
+              onClick={onEndTurn}
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black rounded-xl text-sm transition shadow-lg shadow-emerald-950/60 border border-emerald-400/50 animate-pulse"
+            >
+              <CheckCircle2 size={17} />
+              <span>Turu Bitir</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-amber-200/70 italic bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
+              <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>{view.players[view.activePlayerId]?.name || 'Diğer oyuncu'} oynuyor...</span>
+            </div>
+          )}
+        </div>
+      </footer>
+
+      {/* İnşaat Onay Modalı */}
       {buildTargetCard && (
         <BuildModal
           card={buildTargetCard.card}
