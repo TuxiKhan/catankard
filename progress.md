@@ -11,7 +11,7 @@
 
 ## Tamamlanan 12 Maddelik UI/UX & Motor İyileştirmeleri
 1. **Büyük & Serbest Sürüklenebilir Masa Kartları:** Masadaki kartlar büyütüldü (~125x186px), her oyuncu kendi alanında kartları serbestçe sürükleyip bırakabilir (`kart yerde kalcak`).
-2. **Sıfır Yapay Metin & Saf Kart Görseli:** Kartların üstündeki, altındaki ve masadaki tüm açıklamalar, rozetler, yapay çerçeveler ve tarayıcı `title` tooltip balonları tamamen kaldırıldı; sadece saf kartlar görünüyor.
+2. **Sıfır Yapay Metin & Saf Kart Görseli:** Kartların üstündeki, altındaki ve masadaki tüm açıklamalar, rozetler, yapay çerçeveler ve tarayıcı `title` tooltip balonları tamamen kaldırıldı; yapay "İlk Köy" metin katmanı silinerek masadaki köylerde doğrudan detay modalındaki orijinal tam kart görseli (`building_settlement.png`) kullanıldı.
 3. **Doğal Oyuncu Kart Yelpazeleri:** Oyuncu kart yelpazeleri masaya ve oyuncuya bakacak şekilde (`bottom center` ekseni, hafif doğal kavis) dik ve doğal konumlandırıldı.
 4. **El Kartı Yasak Bölgesi (Görünmez Sınır):** Eldeki kartların masadaki kartları örtmemesi için görünmez akıllı sınırlandırma (`createSafeZoneClamper`) uygulandı; çirkin yapay kutular kaldırıldı.
 5. **Mavi Parlama & Doğrudan Satın Alma:** Oynanabilir / satın alınabilir kartların etrafına ince mavi parlama uygulandı; önkoşulsuz mavi yanma (açık köy yokken şehir, açık şehir yokken büyükşehir) düzeltildi; mavi parlayan karta tıklandığında popup/buton olmadan doğrudan inşa edilir.
