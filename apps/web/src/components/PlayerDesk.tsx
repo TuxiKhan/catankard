@@ -120,7 +120,7 @@ export const PlayerDesk: React.FC<PlayerDeskProps> = ({
                     isSelected={isSelected}
                     onInspect={onInspectCard}
                     onSelectUpgrade={onSelectStack}
-                    size="sm"
+                    scale={0.85}
                     isDraggable={isYou}
                     position={stackPositions[stack.id]}
                     onPositionChange={(pos) => updateStackPosition(stack.id, pos)}

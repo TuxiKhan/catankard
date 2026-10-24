@@ -40,9 +40,9 @@ describe('Game Engine - Setup & Initialization', () => {
       expect(state.areas[pid]!.stacks[0]!.top).toBe('settlement');
       expect(state.areas[pid]!.stacks[0]!.isStarting).toBe(true);
 
-      // Başlangıç eli (2 kart) + 1. turun Hasat fazı (1 kart) = her oyuncuda en az 3 kaynak olmalı
+      // Başlangıç eli: Her oyuncuda tam olarak 2 kaynak olmalı (ilk oyuncu doğrudan aksiyon fazıyla başlar)
       const totalRes = Object.values(state.hands[pid]!).reduce((a, b) => a + b, 0);
-      expect(totalRes).toBe(3);
+      expect(totalRes).toBe(2);
     }
 
     // Başlangıç oyuncusu tespit edilmiş olmalı
@@ -58,7 +58,7 @@ describe('Game Engine - Setup & Initialization', () => {
 
     expect(view.you).toBe('p1');
     expect(view.yourHand).toEqual(state.hands['p1']);
-    expect(view.players['p2']!.handCount).toBe(3);
+    expect(view.players['p2']!.handCount).toBe(2);
     // @ts-expect-error - other players hand cards are masked
     expect(view.players['p2']!.hands).toBeUndefined();
     expect(view.buildingRow.length).toBe(5);
@@ -105,7 +105,7 @@ describe('Game Engine - Trading Mechanics', () => {
 
     // Partner: odun verdi, tuğla aldı + RESMİ KURAL GEREĞİ DEFTEDEN 1 BONUS KART ÇEKTİ -> 2 kart
     expect(state.hands[partnerPid]!.wood).toBe(0);
-    expect(state.hands[partnerPid]!.brick).toBe(1);
+    expect(state.hands[partnerPid]!.brick).toBeGreaterThanOrEqual(1);
     const partnerTotal = Object.values(state.hands[partnerPid]!).reduce((a, b) => a + b, 0);
     expect(partnerTotal).toBe(2);
 

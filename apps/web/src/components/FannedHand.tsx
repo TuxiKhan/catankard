@@ -149,31 +149,23 @@ export const FannedHand: React.FC<FannedHandProps> = ({
   const cardW = baseW * scale;
   const cardH = baseH * scale;
 
-  const isCornerFan =
-    activeCorner === 'top-left' ||
-    activeCorner === 'top-right' ||
-    activeCorner === 'bottom-left' ||
-    activeCorner === 'bottom-right';
-
-  const stepX = (compact ? 6 : 9) * scale;
-  const stepY = (compact ? 2 : 3) * scale;
-  const overlapSpacing = (compact ? 22 : 36) * scale;
-  const arcStepY = (compact ? 5 : 8) * scale;
+  const isCenter = activeCorner === 'bottom-center';
   const mid = (totalCards - 1) / 2;
+
+  // Yelpaze aralıkları: Kartların birbirinin üzerine doğal şekilde binmesi
+  const overlapSpacing = isCenter ? (compact ? 22 : 36) * scale : (compact ? 16 : 24) * scale;
+  const arcStepY = (compact ? 3 : 5) * scale;
 
   // Konteyner boyutları
   let containerWidth: number;
   let containerHeight: number;
 
-  if (isCornerFan) {
-    const maxTiltRad = 36 * (Math.PI / 180);
-    const cardSpanX = cardW * Math.cos(maxTiltRad) + cardH * Math.sin(maxTiltRad);
-    const cardSpanY = cardH * Math.cos(maxTiltRad) + cardW * Math.sin(maxTiltRad);
-    containerWidth = Math.round(cardSpanX + (totalCards - 1) * stepX + 24);
-    containerHeight = Math.round(cardSpanY + (totalCards - 1) * stepY + 24);
-  } else {
+  if (isCenter) {
     containerWidth = Math.round(cardW + (totalCards - 1) * overlapSpacing + 48);
-    containerHeight = Math.round(cardH + (compact ? 28 : 50));
+    containerHeight = Math.round(cardH + (compact ? 28 : 50) * scale);
+  } else {
+    containerWidth = Math.round(cardW + (totalCards - 1) * overlapSpacing + 16);
+    containerHeight = Math.round(cardH + (compact ? 14 : 20) * scale + 16);
   }
 
   // Hizalama konteyner sınıfları (Sadece align açıkça belirtildiyse fixed konumu kullan)
@@ -224,93 +216,94 @@ export const FannedHand: React.FC<FannedHandProps> = ({
           let zIndex = i + 1;
           let currentScale = 1;
 
-          // Açı hesaplaması
-          const startAngle = 5;
-          const maxSpread = compact ? 26 : 30;
+          // Açı hesaplaması: -10° ile +10° arası doğal, hafif kavis
+          const maxSpread = compact ? 18 : 22;
           const stepAngle =
             totalCards <= 1
               ? 0
-              : Math.min(compact ? 5 : 7, maxSpread / Math.max(1, totalCards - 1));
+              : Math.min(compact ? 4 : 5, maxSpread / Math.max(1, totalCards - 1));
 
           if (activeCorner === 'top-left') {
-            transformOrigin = 'top left';
-            baseRotation = totalCards <= 1 ? 12 : startAngle + i * stepAngle;
-            translateX = i * stepX;
-            translateY = i * stepY;
+            // Sol üst köşe: Karşında oturan oyuncu elinde kart tutuyor gibi,
+            // kartlar masanın merkezine hafifçe bakacak şekilde (+2° hafif meyil)
+            transformOrigin = 'bottom center';
+            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle + 2;
+            const arcY = Math.abs(i - mid) * arcStepY;
+            translateX = i * overlapSpacing;
+            translateY = arcY;
             cardPositionStyle = {
               top: '8px',
               left: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
-              translateX += 12;
-              translateY += 12;
+              translateY += 10;
               currentScale = 1.15;
               zIndex = 50;
             }
           } else if (activeCorner === 'top-right') {
-            transformOrigin = 'top right';
-            baseRotation = totalCards <= 1 ? -12 : -(startAngle + i * stepAngle);
-            translateX = -i * stepX;
-            translateY = i * stepY;
+            // Sağ üst köşe: Masanın merkezine hafifçe bakacak şekilde (-2° hafif meyil)
+            transformOrigin = 'bottom center';
+            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle - 2;
+            const arcY = Math.abs(i - mid) * arcStepY;
+            translateX = i * overlapSpacing;
+            translateY = arcY;
             cardPositionStyle = {
               top: '8px',
-              right: '8px',
+              left: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
-              translateX -= 12;
-              translateY += 12;
+              translateY += 10;
               currentScale = 1.15;
               zIndex = 50;
             }
           } else if (activeCorner === 'bottom-left') {
-            transformOrigin = 'bottom left';
-            baseRotation = totalCards <= 1 ? 12 : startAngle + i * stepAngle;
-            translateX = i * stepX;
-            translateY = -i * stepY;
+            transformOrigin = 'bottom center';
+            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle + 2;
+            const arcY = Math.abs(i - mid) * arcStepY;
+            translateX = i * overlapSpacing;
+            translateY = -arcY;
             cardPositionStyle = {
               bottom: '8px',
               left: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
-              translateX += 12;
               translateY -= 16;
               currentScale = 1.15;
               zIndex = 50;
             }
           } else if (activeCorner === 'bottom-right') {
-            transformOrigin = 'bottom right';
-            baseRotation = totalCards <= 1 ? -12 : -(startAngle + i * stepAngle);
-            translateX = -i * stepX;
-            translateY = -i * stepY;
+            transformOrigin = 'bottom center';
+            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle - 2;
+            const arcY = Math.abs(i - mid) * arcStepY;
+            translateX = i * overlapSpacing;
+            translateY = -arcY;
             cardPositionStyle = {
               bottom: '8px',
-              right: '8px',
+              left: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
-              translateX -= 16;
-              translateY -= 24;
+              translateY -= 16;
               currentScale = 1.15;
               zIndex = 50;
             } else if (isSelected) {
-              translateX -= 8;
-              translateY -= 14;
+              translateY -= 12;
               zIndex = 40;
             }
           } else {
             // bottom-center (aktif oyuncunun merkezdeki eli veya varsayılan)
             transformOrigin = 'bottom center';
-            const maxCenterSpread = compact ? 24 : 36;
+            const maxCenterSpread = compact ? 24 : 34;
             const centerAngleStep =
               totalCards <= 1
                 ? 0
-                : Math.min(compact ? 5 : 7, maxCenterSpread / Math.max(1, totalCards - 1));
+                : Math.min(compact ? 5 : 6.5, maxCenterSpread / Math.max(1, totalCards - 1));
             baseRotation = (i - mid) * centerAngleStep;
 
-            const arcY = Math.abs(i - mid) * arcStepY;
+            const arcY = Math.abs(i - mid) * (compact ? 4 : 7) * scale;
 
             // Komşuların hafifçe iki yana aralanması (nudge effect)
             let neighborShiftX = 0;
@@ -353,9 +346,20 @@ export const FannedHand: React.FC<FannedHandProps> = ({
               key={`${res ?? 'card'}-${i}`}
               onClick={() => {
                 if (disabled) return;
-                if (res) {
-                  if (onCardClick) onCardClick(res, i);
-                  if (onInspectCard) onInspectCard(res);
+                if (res && onCardClick) {
+                  onCardClick(res, i);
+                }
+              }}
+              onContextMenu={(e) => {
+                if (res && onInspectCard) {
+                  e.preventDefault();
+                  onInspectCard(res);
+                }
+              }}
+              onDoubleClick={(e) => {
+                if (res && onInspectCard) {
+                  e.stopPropagation();
+                  onInspectCard(res);
                 }
               }}
               onMouseEnter={() => handleMouseEnter(res, i)}
@@ -379,7 +383,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
             >
               {/* Kart İçeriği */}
               {isOpponentHand || !res ? (
-                /* RAKİP KARTI - ARKASI DÖNÜK CATAN DESENİ */
+                /* RAKİP KARTI - ARKASI DÖNÜK CATAN DESENİ (Bize bakacak şekilde dik ve doğal) */
                 <div className="relative w-full h-full bg-gradient-to-br from-amber-950 via-slate-900 to-amber-950 border-2 border-amber-600/70 rounded-xl overflow-hidden flex items-center justify-center">
                   <img
                     src={backImageSrc}
@@ -398,7 +402,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
                   <div className="absolute inset-1 border border-amber-500/30 rounded-lg pointer-events-none" />
                 </div>
               ) : (
-                /* AKTİF OYUNCU KARTI - AÇIK KAYNAK */
+                /* AKTİF OYUNCU KARTI - AÇIK KAYNAK (Üzerinde metin yok, saf kart görseli) */
                 <div
                   className={`relative w-full h-full rounded-xl overflow-hidden border-2 bg-slate-900 transition-colors ${
                     meta ? meta.border : 'border-amber-600'
@@ -406,33 +410,20 @@ export const FannedHand: React.FC<FannedHandProps> = ({
                 >
                   <img
                     src={frontImageSrc}
-                    alt={meta?.label ?? res}
+                    alt={res}
                     className="w-full h-full object-cover select-none pointer-events-none"
                     onError={(e) => {
                       (e.currentTarget as HTMLElement).style.display = 'none';
                     }}
                   />
 
-                  {/* Fallback Arka Plan Katmanı */}
+                  {/* Fallback Arka Plan Katmanı (Sadece resim yüklenemezse simge görünür) */}
                   <div
                     className={`absolute inset-0 -z-10 bg-gradient-to-b ${
                       meta?.bg ?? 'from-slate-800 to-slate-950'
-                    } flex flex-col items-center justify-between p-1.5 text-center`}
+                    } flex items-center justify-center p-1.5`}
                   >
-                    <span className="text-xl">{meta?.icon}</span>
-                    <span className="text-[10px] font-bold text-white tracking-wide uppercase">
-                      {meta?.label}
-                    </span>
-                  </div>
-
-                  {/* Sol Üst Mini Rozet */}
-                  <div className="absolute top-1 left-1 bg-slate-950/80 backdrop-blur-xs border border-white/20 rounded-md px-1 py-0.5 flex items-center gap-0.5 shadow-sm">
-                    <span className="text-[10px]">{meta?.icon}</span>
-                    {!compact && (
-                      <span className="text-[9px] font-bold text-amber-200">
-                        {meta?.label.slice(0, 3)}
-                      </span>
-                    )}
+                    <span className="text-3xl">{meta?.icon}</span>
                   </div>
 
                   {/* Alt Işıltı Çizgisi */}
@@ -442,7 +433,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
                   />
 
                   {isSelected && (
-                    <div className="absolute inset-0 bg-amber-400/15 pointer-events-none border-2 border-yellow-300 rounded-xl animate-pulse" />
+                    <div className="absolute inset-0 bg-amber-400/20 pointer-events-none border-2 border-yellow-300 rounded-xl animate-pulse" />
                   )}
                 </div>
               )}

@@ -343,7 +343,6 @@ function createGame(config, now) {
   }
   const firstPlayer = turnOrder[startingPlayerIndex];
   state.log.push({ t: "turn_started", playerId: firstPlayer });
-  executeHarvestPhase(state);
   checkWinCondition(state);
   return state;
 }

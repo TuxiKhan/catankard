@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { BuildingCard, MetropolisCard, PlayerView } from '@catankard/engine';
 import {
   getBonusImageUrl,
@@ -6,6 +6,7 @@ import {
   getMetropolisImageUrl,
 } from '../lib/cardImages.ts';
 import { canAffordCard } from '../lib/canAfford.ts';
+import { DeckBrowserModal, type DeckType } from './DeckBrowserModal.tsx';
 
 export interface BuildingRowMatProps {
   view: PlayerView;
@@ -21,29 +22,35 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   onSelectBuild,
   scale = 1,
 }) => {
+  const [browsingDeck, setBrowsingDeck] = useState<DeckType | null>(null);
+
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
   const roads = view.players[view.you]?.area?.roads ?? 0;
   const subUsed = view.turnFlags?.roadSubstitutionUsed ?? false;
 
+  const userStacks = view.players[view.you]?.area?.stacks ?? [];
+  const hasOpenSettlement = userStacks.some((s) => s.top === 'settlement');
+  const hasOpenCity = userStacks.some((s) => s.top === 'city');
+
   const topMetro = view.metropolisStack.length > 0 ? view.metropolisStack[0] : null;
-  const canAffordMetro = canAffordCard('metropolis', view.yourHand, roads, subUsed);
+  const canAffordMetro =
+    hasOpenCity && canAffordCard('metropolis', view.yourHand, roads, subUsed);
   const canBuildMetro = isActive && topMetro !== null && canAffordMetro;
 
-  // Taban kart boyutları büyütüldü: 74x108 px -> 96x140 px (~1.3x ölçek)
+  // Taban kart boyutları: 96x140 px (~1.3x ölçek)
   const cardW = Math.round(96 * scale);
   const cardH = Math.round(140 * scale);
 
   return (
     <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-6 select-none relative my-2">
-      {/* 1. SOL KENAR: Kapalı Kaynak Kartı Destesi (Altın/kahverengi desenli arka yüz) */}
+      {/* 1. SOL KENAR: Kapalı Kaynak Kartı Destesi */}
       <div
-        className="flex flex-col items-center gap-1.5 group cursor-pointer"
-        onClick={() => onInspectCard('brick')}
+        className="flex flex-col items-center gap-1 group cursor-pointer"
+        onClick={() => setBrowsingDeck('resource')}
         onContextMenu={(e) => {
           e.preventDefault();
-          onInspectCard('brick');
+          setBrowsingDeck('resource');
         }}
-        title={`Kaynak Destesi (${view.resourceDeckCount} kart)`}
       >
         <div
           style={{ width: `${cardW}px`, height: `${cardH}px` }}
@@ -53,7 +60,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           <div className="absolute inset-0 bg-amber-900/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
           <img
             src="/assets/cards/resource/resource_back.png"
-            alt="Kaynak Destesi (Altın/Kahverengi)"
+            alt="Kaynak Destesi"
             className="w-full h-full object-cover"
             draggable={false}
           />
@@ -62,42 +69,32 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             {view.resourceDeckCount}
           </div>
         </div>
-        <span className="text-xs text-amber-200/90 font-bold tracking-tight">Kaynaklar</span>
       </div>
 
-      {/* 2. ORTA: YATAY BEYAZ ÇERÇEVELİ "BUILDING ROW" ALANI */}
-      <div className="relative border-2 border-white/70 rounded-2xl px-3.5 py-2.5 bg-black/35 backdrop-blur-xs shadow-2xl flex flex-col items-center">
-        {/* Başlık Etiketi */}
-        <div className="absolute -top-3 px-3.5 py-0.5 bg-gradient-to-r from-red-950 via-rose-950 to-red-950 text-white/90 text-xs tracking-widest uppercase font-extrabold border border-white/50 rounded-full shadow-md">
-          building row
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 pt-1">
-          {/* A. 1 ADET KAPALI İNŞAAT KARTI DESTESİ (Yeşil çekiç amblemli arka yüz) */}
+      {/* 2. ORTA: YATAY "BUILDING ROW" ALANI */}
+      <div className="relative border-2 border-white/60 rounded-2xl px-3.5 py-2.5 bg-black/35 backdrop-blur-xs shadow-2xl flex flex-col items-center">
+        <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3">
+          {/* A. 1 ADET KAPALI İNŞAAT KARTI DESTESİ */}
           <div
             className="relative rounded-xl overflow-hidden border border-emerald-600/70 shadow-lg cursor-pointer group transition-transform hover:-translate-y-0.5 bg-emerald-950"
             style={{ width: `${cardW}px`, height: `${cardH}px` }}
-            onClick={() => onInspectCard('settlement')}
+            onClick={() => setBrowsingDeck('building')}
             onContextMenu={(e) => {
               e.preventDefault();
-              onInspectCard('settlement');
+              setBrowsingDeck('building');
             }}
-            title={`İnşaat Destesi (${view.buildingDeckCount} kart)`}
           >
             {/* Katman efekti */}
             <div className="absolute inset-0 bg-emerald-950/60 rounded-xl translate-x-0.5 translate-y-0.5 -z-10" />
             <img
               src="/assets/cards/building/building_back.png"
-              alt="İnşaat Kartı Destesi (Yeşil Çekiç)"
+              alt="İnşaat Kartı Destesi"
               className="w-full h-full object-cover"
               draggable={false}
             />
             {/* Deste kart sayısı rozeti */}
             <div className="absolute bottom-1.5 right-1.5 bg-black/85 text-emerald-300 text-xs font-black px-2 py-0.5 rounded shadow border border-emerald-500/40 pointer-events-none">
               {view.buildingDeckCount}
-            </div>
-            <div className="absolute top-1 left-1 bg-emerald-900/90 text-emerald-200 text-[9px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
-              Deste
             </div>
           </div>
 
@@ -113,27 +110,27 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
                   style={{ width: `${cardW}px`, height: `${cardH}px` }}
                 >
                   <span className="text-xs font-bold">#{index + 1}</span>
-                  <span className="text-[10px] uppercase">Boş</span>
                 </div>
               );
             }
 
-            const canAfford = isActive && canAffordCard(card.type, view.yourHand, roads, subUsed);
+            let canAfford = isActive && canAffordCard(card.type, view.yourHand, roads, subUsed);
+            if (card.type === 'city' && !hasOpenSettlement) {
+              canAfford = false;
+            }
 
             return (
               <div
                 key={card.id || index}
-                className={`relative rounded-xl overflow-hidden border transition-all duration-200 cursor-pointer ${
+                className={`relative rounded-xl overflow-hidden border transition-all duration-200 select-none ${
                   canAfford
-                    ? 'border-amber-400/80 shadow-md hover:shadow-[0_0_25px_rgba(251,191,36,0.85)] hover:ring-2 hover:ring-yellow-400 hover:scale-105 hover:border-yellow-300'
-                    : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50 hover:scale-[1.02]'
+                    ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] hover:scale-105 cursor-pointer'
+                    : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50 hover:scale-[1.02] cursor-default'
                 }`}
                 style={{ width: `${cardW}px`, height: `${cardH}px` }}
                 onClick={() => {
                   if (canAfford) {
                     onSelectBuild(card, 'row');
-                  } else {
-                    onInspectCard(card.type);
                   }
                 }}
                 onContextMenu={(e) => {
@@ -144,11 +141,6 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
                   e.stopPropagation();
                   onInspectCard(card.type);
                 }}
-                title={
-                  canAfford
-                    ? `${card.type} (İnşa etmek için tıkla)`
-                    : `${card.type} (İncelemek için tıkla)`
-                }
               >
                 <img
                   src={getBuildingImageUrl(card.type)}
@@ -164,41 +156,28 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
 
       {/* 3. SAĞ KENAR: Büyükşehir Destesi & Kapalı Olay Kartı Destesi */}
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* BÜYÜKŞEHİR DESTESİ (Metropolis A veya B) YUVASI */}
-        <div className="flex flex-col items-center gap-1.5">
+        {/* BÜYÜKŞEHİR DESTESİ YUVASI */}
+        <div className="flex flex-col items-center gap-1">
           <div
-            className={`relative rounded-xl overflow-hidden border transition-all duration-200 cursor-pointer ${
+            className={`relative rounded-xl overflow-hidden border transition-all duration-200 select-none ${
               canBuildMetro
-                ? 'border-yellow-400/80 shadow-md hover:shadow-[0_0_25px_rgba(251,191,36,0.85)] hover:ring-2 hover:ring-yellow-400 hover:scale-105 hover:border-yellow-300'
-                : 'border-amber-900/40 opacity-90 hover:opacity-100 hover:border-amber-700/60 hover:scale-[1.02]'
+                ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] hover:scale-105 cursor-pointer'
+                : 'border-amber-900/40 opacity-90 hover:opacity-100 hover:border-amber-700/60 hover:scale-[1.02] cursor-default'
             }`}
             style={{ width: `${cardW}px`, height: `${cardH}px` }}
             onClick={() => {
               if (canBuildMetro && topMetro) {
                 onSelectBuild(topMetro, 'metropolis');
-              } else if (topMetro) {
-                onInspectCard('metropolis', topMetro.kind);
               }
             }}
             onContextMenu={(e) => {
               e.preventDefault();
-              if (topMetro) {
-                onInspectCard('metropolis', topMetro.kind);
-              }
+              setBrowsingDeck('metropolis');
             }}
             onDoubleClick={(e) => {
               e.stopPropagation();
-              if (topMetro) {
-                onInspectCard('metropolis', topMetro.kind);
-              }
+              setBrowsingDeck('metropolis');
             }}
-            title={
-              topMetro
-                ? canBuildMetro
-                  ? 'Büyükşehir (İnşa etmek için tıkla)'
-                  : 'Büyükşehir (İncelemek için tıkla)'
-                : 'Büyükşehir (Tükendi)'
-            }
           >
             {topMetro ? (
               <img
@@ -218,18 +197,16 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
               x{view.metropolisStack.length}
             </div>
           </div>
-          <span className="text-xs text-yellow-300/90 font-bold tracking-tight">B.Şehir</span>
         </div>
 
-        {/* KAPALI OLAY KARTI DESTESİ (Gri Kelt motifli arka yüz) */}
+        {/* KAPALI OLAY KARTI DESTESİ */}
         <div
-          className="flex flex-col items-center gap-1.5 group cursor-pointer"
-          onClick={() => onInspectCard('robber')}
+          className="flex flex-col items-center gap-1 group cursor-pointer"
+          onClick={() => setBrowsingDeck('event')}
           onContextMenu={(e) => {
             e.preventDefault();
-            onInspectCard('robber');
+            setBrowsingDeck('event');
           }}
-          title={`Olay Destesi (${view.eventDeckCount} kart)`}
         >
           <div
             style={{ width: `${cardW}px`, height: `${cardH}px` }}
@@ -238,7 +215,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             <div className="absolute inset-0 bg-slate-800/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
             <img
               src="/assets/cards/event/event_back.png"
-              alt="Olay Destesi (Gri Kelt Motifi)"
+              alt="Olay Destesi"
               className="w-full h-full object-cover"
               draggable={false}
             />
@@ -247,52 +224,14 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
               {view.eventDeckCount}
             </div>
           </div>
-          <span className="text-xs text-slate-300/90 font-bold tracking-tight">Olaylar</span>
         </div>
       </div>
 
-      {/* Bonus Kart Rozetleri (En Uzun Yol & En Güçlü Ordu) */}
-      <div className="hidden xl:flex flex-col gap-2 absolute -right-36 top-1 text-xs">
-        <div
-          onClick={() => onInspectCard('longest_route')}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            onInspectCard('longest_route');
-          }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer backdrop-blur-xs transition ${
-            view.longestRouteOwner
-              ? 'border-amber-400 bg-amber-950/70 text-amber-200 shadow-md'
-              : 'border-slate-800 bg-slate-900/50 text-slate-400'
-          }`}
-          title="En Uzun Yol (2 Zafer Puanı)"
-        >
-          <img src={getBonusImageUrl('longest_route')} alt="Yol" className="w-4 h-6 object-contain" />
-          <span className="font-semibold">2 ZP Yol</span>
-          {view.longestRouteOwner && (
-            <span className="font-bold text-white">({view.players[view.longestRouteOwner]?.name})</span>
-          )}
-        </div>
-
-        <div
-          onClick={() => onInspectCard('largest_army')}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            onInspectCard('largest_army');
-          }}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border cursor-pointer backdrop-blur-xs transition ${
-            view.largestArmyOwner
-              ? 'border-red-400 bg-red-950/70 text-red-200 shadow-md'
-              : 'border-slate-800 bg-slate-900/50 text-slate-400'
-          }`}
-          title="En Güçlü Ordu (2 Zafer Puanı)"
-        >
-          <img src={getBonusImageUrl('largest_army')} alt="Ordu" className="w-4 h-6 object-contain" />
-          <span className="font-semibold">2 ZP Ordu</span>
-          {view.largestArmyOwner && (
-            <span className="font-bold text-white">({view.players[view.largestArmyOwner]?.name})</span>
-          )}
-        </div>
-      </div>
+      {/* Deste Gezinme Karusel Modalı */}
+      <DeckBrowserModal
+        deckType={browsingDeck}
+        onClose={() => setBrowsingDeck(null)}
+      />
     </div>
   );
 };

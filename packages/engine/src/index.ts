@@ -132,10 +132,9 @@ export function createGame(config: GameConfig, now: number): GameState {
     giveResourcesToPlayer(state, pid, 2);
   }
 
-  // 7. İlk turun başlangıcı ve Hasat Fazı
+  // 7. İlk turun başlangıcı (Resmi Catan On the Road kuralları gereği ilk oyuncu doğrudan Aksiyon Fazı ile başlar, Hasat Fazı işletilmez)
   const firstPlayer = turnOrder[startingPlayerIndex]!;
   state.log.push({ t: 'turn_started', playerId: firstPlayer });
-  executeHarvestPhase(state);
   checkWinCondition(state);
 
   return state;

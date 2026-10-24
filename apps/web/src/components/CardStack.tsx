@@ -4,7 +4,6 @@ import type {
   MetropolisBKind,
   SettlementStack,
 } from '@catankard/engine';
-import { Eye, Hammer, Move } from 'lucide-react';
 import {
   getBuildingImageUrl,
   getMetropolisImageUrl,
@@ -30,10 +29,16 @@ export interface CardStackProps {
   onSelectUpgrade?: (stackId: string) => void | Promise<void>;
   /** Alternatif isim: onSelect */
   onSelect?: (stackId: string) => void | Promise<void>;
-  /** Boyut modu: sm (kompakt), md (varsayılan), lg (büyük) */
-  size?: 'sm' | 'md' | 'lg';
-  /** Boyutlandırma çarpanı (örn: 0.85, 1) */
+  /** Boyutlandırma çarpanı */
   scale?: number;
+  /** Boyut preset'i ('sm', 'md', 'lg') */
+  size?: 'sm' | 'md' | 'lg' | string;
+  /** Taban genişlik (varsayılan: 125px) */
+  baseWidth?: number;
+  /** Taban yükseklik (varsayılan: 186px) */
+  baseHeight?: number;
+  /** Katman dikey basamak ofseti (varsayılan: 36px) */
+  layerOffset?: number;
   /** Ek Tailwind sınıfları */
   className?: string;
 
@@ -43,7 +48,7 @@ export interface CardStackProps {
   position?: CardPosition;
   /** Konum değiştiğinde çağrılır */
   onPositionChange?: (pos: CardPosition) => void;
-  /** Sürükleme durumu değiştiğinde tetiklenir (aktif oyuncu yasak bölge kılavuzu için) */
+  /** Sürükleme durumu değiştiğinde tetiklenir */
   onDragChange?: (isDragging: boolean) => void;
   /** Güvenli masa alanı sınırlandırma (Boundary Clamping) fonksiyonu */
   clampPosition?: (pos: CardPosition) => CardPosition;
@@ -57,8 +62,11 @@ export const CardStack: React.FC<CardStackProps> = ({
   onInspectCard,
   onSelectUpgrade,
   onSelect,
-  size = 'md',
   scale,
+  size = 'md',
+  baseWidth = 125,
+  baseHeight = 186,
+  layerOffset = 36,
   className = '',
   isDraggable = false,
   position,
@@ -69,13 +77,13 @@ export const CardStack: React.FC<CardStackProps> = ({
   const inspectFn = onInspectCard || onInspect;
   const selectFn = onSelectUpgrade || onSelect;
 
-  // Taban boyutları büyütüldü: 90x130 px -> 110x160 px
-  const baseScale = scale ?? (size === 'sm' ? 0.82 : size === 'lg' ? 1.2 : 1);
-  const cardW = Math.round(110 * baseScale);
-  const cardH = Math.round(160 * baseScale);
-  const offset = Math.round(34 * baseScale);
+  // Taban boyutları büyütüldü: ~125px x 186px
+  const effectiveScale = scale ?? (size === 'sm' ? 0.8 : size === 'lg' ? 1.2 : 1);
+  const cardW = Math.round(baseWidth * effectiveScale);
+  const cardH = Math.round(baseHeight * effectiveScale);
+  const offset = Math.round(layerOffset * effectiveScale);
 
-  const { top, metropolis } = stack;
+  const { top, metropolis, isStarting, isStartingPlayerCard } = stack;
   const hasCity = top === 'city' || top === 'metropolis';
   const hasMetropolis = top === 'metropolis';
 
@@ -83,8 +91,15 @@ export const CardStack: React.FC<CardStackProps> = ({
   const layerCount = hasMetropolis ? 3 : hasCity ? 2 : 1;
   const totalHeight = cardH + (layerCount - 1) * offset;
 
-  // En üstteki geçerli Zafer Puanı
-  const currentVP = hasMetropolis ? 3 : hasCity ? 2 : 1;
+  // Başlangıç köyü resmi
+  const getSettlementImgUrl = (): string => {
+    if (isStarting) {
+      return isStartingPlayerCard
+        ? '/assets/cards/starting/starting_settlement_front_starting_player.png'
+        : '/assets/cards/starting/starting_settlement_front.png';
+    }
+    return getBuildingImageUrl('settlement');
+  };
 
   // Sürükle-bırak durumları
   const [isDragging, setIsDragging] = useState(false);
@@ -95,12 +110,6 @@ export const CardStack: React.FC<CardStackProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggable) return;
     if (e.button !== 0) return; // Sadece sol tık
-
-    // Buton veya incele tıklandıysa sürükleme başlatma
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[data-no-drag="true"]')) {
-      return;
-    }
 
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     justDraggedRef.current = false;
@@ -165,7 +174,6 @@ export const CardStack: React.FC<CardStackProps> = ({
     dragStartRef.current = null;
     setDragOffset({ x: 0, y: 0 });
 
-    // Tıklama olayının sürükleme sonrasında yutulması
     setTimeout(() => {
       justDraggedRef.current = false;
     }, 120);
@@ -190,7 +198,12 @@ export const CardStack: React.FC<CardStackProps> = ({
     e.stopPropagation();
     if (isSelectable && selectFn) {
       selectFn(stack.id);
-    } else if (inspectFn) {
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (inspectFn) {
       if (hasMetropolis && metropolis) {
         inspectFn('metropolis', metropolis.kind);
       } else {
@@ -200,15 +213,10 @@ export const CardStack: React.FC<CardStackProps> = ({
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
-    if (!isDraggable) return;
     e.stopPropagation();
-    // Çift tıklandığında kartı orijinal masadaki başlangıç konumuna sıfırla
-    onPositionChange?.({ x: 0, y: 0 });
-  };
-
-  const handleInspectTop = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (inspectFn) {
+    if (isDraggable) {
+      onPositionChange?.({ x: 0, y: 0 });
+    } else if (inspectFn) {
       if (hasMetropolis && metropolis) {
         inspectFn('metropolis', metropolis.kind);
       } else {
@@ -228,6 +236,7 @@ export const CardStack: React.FC<CardStackProps> = ({
   return (
     <div
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       onDoubleClick={handleDoubleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -240,36 +249,20 @@ export const CardStack: React.FC<CardStackProps> = ({
         zIndex: isDragging ? 50 : isSelected ? 20 : isSelectable ? 10 : hasCustomPos ? 5 : 1,
         touchAction: isDraggable ? 'none' : 'auto',
       }}
-      title={
-        isDraggable
-          ? 'Masada serbestçe sürükleyip bırakabilirsiniz (sıfırlamak için çift tıklayın)'
-          : undefined
-      }
-      className={`relative group select-none ${
+      className={`relative select-none ${
         isDragging
-          ? 'cursor-grabbing scale-[1.04] shadow-2xl z-50 ring-2 ring-amber-400/80 transition-none'
+          ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
           : isDraggable
-          ? 'cursor-grab hover:scale-[1.02] transition-transform duration-75'
-          : 'cursor-pointer hover:scale-[1.02] transition-all duration-200'
+          ? 'cursor-grab hover:scale-[1.02] transition-transform duration-100'
+          : 'cursor-pointer hover:scale-[1.02] transition-all duration-150'
       } ${
         isSelected
-          ? 'scale-105'
+          ? 'ring-4 ring-sky-400 shadow-sky-500/40 shadow-2xl rounded-xl'
           : isSelectable
-          ? 'hover:scale-[1.03]'
+          ? 'ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.7)] animate-pulse rounded-xl'
           : ''
       } ${className}`}
     >
-      {/* Sürüklenebilir Kart Rozeti (hover ile görünür ipucu) */}
-      {isDraggable && !isDragging && (
-        <div
-          data-no-drag="true"
-          className="absolute -top-2 left-1 z-30 opacity-0 group-hover:opacity-80 transition-opacity bg-black/80 border border-amber-400/40 rounded px-1.5 py-0.5 pointer-events-none text-[8px] text-amber-200 font-mono flex items-center gap-1 shadow-md"
-        >
-          <Move size={8} className="text-amber-300" />
-          <span>Taşı</span>
-        </div>
-      )}
-
       {/* 1. KATMAN: KÖY KARTI (En Altta, Sabit top: 0) */}
       <div
         style={{
@@ -279,32 +272,21 @@ export const CardStack: React.FC<CardStackProps> = ({
           left: 0,
           zIndex: 1,
         }}
-        className={`absolute rounded-xl overflow-hidden border-2 bg-slate-900 shadow-md transition-shadow ${
-          isSelected
-            ? 'border-yellow-400 ring-2 ring-yellow-400/80 shadow-yellow-500/20 shadow-xl'
-            : isSelectable
-            ? 'border-emerald-500 ring-2 ring-emerald-400/50 animate-pulse'
-            : 'border-amber-700/80 hover:border-amber-500'
+        className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-lg ${
+          isSelected || isSelectable
+            ? 'border-sky-400'
+            : ''
         }`}
       >
         <img
-          src={getBuildingImageUrl('settlement')}
+          src={getSettlementImgUrl()}
           alt="Köy"
-          className="w-full h-full object-contain pointer-events-none"
+          className="w-full h-full object-cover pointer-events-none"
+          draggable={false}
           onError={(e) => {
             (e.currentTarget as HTMLElement).style.display = 'none';
           }}
         />
-
-        {/* Köy Üst Başlık Şeridi */}
-        <div className="absolute top-0 inset-x-0 h-7 bg-gradient-to-b from-amber-950/95 via-amber-900/90 to-transparent p-1.5 flex items-center justify-between pointer-events-none">
-          <span className="font-black tracking-wide text-amber-200 uppercase text-[10px]">
-            Köy
-          </span>
-          <span className="bg-red-700 text-white font-extrabold text-[9px] px-1.5 py-0.5 rounded-full shadow-xs">
-            1 ZP
-          </span>
-        </div>
       </div>
 
       {/* 2. KATMAN: ŞEHİR KARTI (Köyün üstüne offset px aşağı kaydırılarak biner) */}
@@ -317,32 +299,23 @@ export const CardStack: React.FC<CardStackProps> = ({
             left: 0,
             zIndex: 2,
           }}
-          className={`absolute rounded-xl overflow-hidden border-2 bg-slate-900 shadow-lg transition-transform ${
+          className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-xl ${
             isSelected
-              ? 'border-yellow-400 ring-2 ring-yellow-400/80'
+              ? 'border-yellow-400'
               : isSelectable
-              ? 'border-emerald-500 ring-2 ring-emerald-400/50 animate-pulse'
-              : 'border-sky-600/90 hover:border-sky-400'
+              ? 'border-emerald-400'
+              : ''
           }`}
         >
           <img
             src={getBuildingImageUrl('city')}
             alt="Şehir"
-            className="w-full h-full object-contain pointer-events-none"
+            className="w-full h-full object-cover pointer-events-none"
+            draggable={false}
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
           />
-
-          {/* Şehir Üst Başlık Şeridi */}
-          <div className="absolute top-0 inset-x-0 h-7 bg-gradient-to-b from-blue-950/95 via-blue-900/90 to-transparent p-1.5 flex items-center justify-between pointer-events-none">
-            <span className="font-black tracking-wide text-sky-200 uppercase text-[10px]">
-              Şehir
-            </span>
-            <span className="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-xs">
-              2 ZP
-            </span>
-          </div>
         </div>
       )}
 
@@ -356,10 +329,10 @@ export const CardStack: React.FC<CardStackProps> = ({
             left: 0,
             zIndex: 3,
           }}
-          className={`absolute rounded-xl overflow-hidden border-2 bg-slate-900 shadow-xl ${
-            isSelected
-              ? 'border-yellow-400 ring-2 ring-yellow-400/80'
-              : 'border-purple-600/90 hover:border-purple-400'
+          className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-2xl ${
+            isSelected || isSelectable
+              ? 'border-sky-400'
+              : ''
           }`}
         >
           <img
@@ -369,43 +342,12 @@ export const CardStack: React.FC<CardStackProps> = ({
                 : '/assets/cards/building/metropolis_A.png'
             }
             alt="Büyükşehir"
-            className="w-full h-full object-contain pointer-events-none"
+            className="w-full h-full object-cover pointer-events-none"
+            draggable={false}
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
           />
-
-          {/* Büyükşehir Üst Başlık Şeridi */}
-          <div className="absolute top-0 inset-x-0 h-7 bg-gradient-to-b from-purple-950/95 via-purple-900/90 to-transparent p-1.5 flex items-center justify-between pointer-events-none">
-            <span className="font-black tracking-wide text-purple-200 uppercase truncate text-[10px]">
-              B.Şehir
-            </span>
-            <span className="bg-purple-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-xs">
-              3 ZP
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* KATMAN ETİKETİ & İNCELE BUTONU (Sağ alt köşe mühür) */}
-      <div
-        data-no-drag="true"
-        className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-xs border border-amber-500/40 rounded-md px-2 py-0.5 shadow-md cursor-pointer hover:border-amber-400 transition"
-        onClick={handleInspectTop}
-        onPointerDown={(e) => e.stopPropagation()}
-        title="Kartı incele"
-      >
-        <span className="text-[11px] font-black text-amber-300">
-          ★ {currentVP}
-        </span>
-        <Eye size={13} className="text-slate-400 hover:text-amber-300 transition" />
-      </div>
-
-      {/* YÜKSELTME SEÇİMİ AURA / ETİKETİ */}
-      {isSelectable && (
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 bg-emerald-600 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-full shadow-lg border border-emerald-300 flex items-center gap-1 animate-bounce">
-          <Hammer size={11} />
-          <span>Yükselt</span>
         </div>
       )}
     </div>

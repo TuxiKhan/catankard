@@ -3,11 +3,25 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 6 – Fiziksel Masaüstü Kart İyileştirmeleri (Kart Büyütme, Serbest Sürükleme, Parlama, Köşe Geometrisi ve Güvenli Bölge) Tamamlandı
+- **Aşama:** STEP 8 – Kullanıcı Geri Bildirimiyle 12 Maddelik UI/UX & Kural İyileştirmeleri Eksiksiz Tamamlandı
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
-- **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1
-- **Canlı Test:** `http://localhost:5173/`
+- **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1 (Edge Functions v3 deployed)
+- **Canlı Test:** `http://localhost:5173/` (Vite dev server aktif)
 - **Son güncelleme:** 2026-10-24
+
+## Tamamlanan 12 Maddelik UI/UX & Motor İyileştirmeleri
+1. **Büyük & Serbest Sürüklenebilir Masa Kartları:** Masadaki kartlar büyütüldü (~125x186px), her oyuncu kendi alanında kartları serbestçe sürükleyip bırakabilir (`kart yerde kalcak`).
+2. **Sıfır Yapay Metin & Saf Kart Görseli:** Kartların üstündeki, altındaki ve masadaki tüm açıklamalar, rozetler, yapay çerçeveler ve tarayıcı `title` tooltip balonları tamamen kaldırıldı; sadece saf kartlar görünüyor.
+3. **Doğal Oyuncu Kart Yelpazeleri:** Oyuncu kart yelpazeleri masaya ve oyuncuya bakacak şekilde (`bottom center` ekseni, hafif doğal kavis) dik ve doğal konumlandırıldı.
+4. **El Kartı Yasak Bölgesi (Görünmez Sınır):** Eldeki kartların masadaki kartları örtmemesi için görünmez akıllı sınırlandırma (`createSafeZoneClamper`) uygulandı; çirkin yapay kutular kaldırıldı.
+5. **Mavi Parlama & Doğrudan Satın Alma:** Oynanabilir / satın alınabilir kartların etrafına ince mavi parlama uygulandı; önkoşulsuz mavi yanma (açık köy yokken şehir, açık şehir yokken büyükşehir) düzeltildi; mavi parlayan karta tıklandığında popup/buton olmadan doğrudan inşa edilir.
+6. **Fiziksel Yol & Şövalye Masa Kartları:** Yol ve Şövalye sayaç panelleri kaldırıldı; masada 1 Başlangıç Yolu + 1 Başlangıç Köyü ile başlanıp inşa edilen her yol, şövalye ve kupa masada fiziksel kart olarak yer alıyor.
+7. **Kapalı Desteler Yatay Karusel Modalı:** Kapalı kaynak, olay, inşaat ve büyükşehir destelerine tıklandığında yatay kaydırmalı karusel modalı (`DeckBrowserModal.tsx`) açılıyor; tüm kart varyasyonları fareyle kaydırılarak incelenebiliyor.
+8. **Sakin Tıklama (İnceleme Modalı Fırlamaması):** Kartlara sol tıklandığında inceleme modalı fırlamıyor; inceleme sadece sağ tık (context menu) ve çift tıkla açılıyor.
+9. **Kural & Motor Denetimi (Başlangıç Eli Düzeltildi):** `createGame` içindeki hatalı erken hasat fazı çağrısı kaldırıldı; oyuncular kural kitapçığına uygun olarak tam 2 kaynak kartı, 1 başlangıç köyü ve 1 başlangıç yoluyla oyuna başlıyor.
+10. **Masada Sıfır Yazı & Köşe İsim/ZP:** Masadaki tüm butonlar ve yazılar ("Düzeni Sıfırla", "building row" vb.) kaldırıldı; sırası gelen oyuncunun alanı hafif mavi efektle parlıyor; ellerin altında sadece `[İsim] [ZP]` yer alıyor.
+11. **Saf Kart İnceleme Modalı:** `CardModal.tsx` içindeki tüm altın çerçeveler, metin kutuları ve açıklamalar yok edildi; yalnızca saf büyük kart ve hafif arka plan blur'u (`backdrop-blur-sm bg-black/50`) bırakıldı.
+12. **Hata & İstisna Düzeltmeleri:** Supabase Edge Function 400/401 kimlik hataları, concurrency uyuşmazlıkları ve frontend kilitlenmeleri çözüldü, testler 15/15 yeşil.
 
 ## Kaynak Materyal
 | Kaynak | Konum | Not |

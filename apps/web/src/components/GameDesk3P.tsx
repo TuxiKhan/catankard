@@ -1,24 +1,18 @@
 import React, { useState } from 'react';
 import {
   ArrowRightLeft,
-  Ban,
   CheckCircle2,
   Clock,
-  Crown,
   LogOut,
-  Shield,
-  Milestone,
-  RotateCcw,
-  ShieldCheck,
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
-import { BuildModal } from './BuildModal.tsx';
 import { CardStack } from './CardStack.tsx';
+import { TableCard } from './TableCard.tsx';
 import { FannedHand } from './FannedHand.tsx';
 import { GameMat } from './GameMat.tsx';
 import { useDraggablePlacement } from '../lib/useDraggablePlacement.ts';
-import { createSafeZoneClamper, HAND_ZONE_CONFIG } from '../lib/safePlacementBoundary.ts';
+import { createSafeZoneClamper } from '../lib/safePlacementBoundary.ts';
 
 interface GameDesk3PProps {
   view: PlayerView;
@@ -43,10 +37,6 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
   onLeaveGame,
 }) => {
   const [selectedStackId, setSelectedStackId] = useState<string | null>(null);
-  const [buildTargetCard, setBuildTargetCard] = useState<{
-    card: BuildingCard | MetropolisCard;
-    source: 'row' | 'metropolis';
-  } | null>(null);
 
   const [pendingUpgrade, setPendingUpgrade] = useState<{
     cardId: string;
@@ -55,15 +45,13 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     substitution?: { replace: Resource; pay: Resource };
   } | null>(null);
 
-  // Masadaki kartların serbestçe sürüklenip bırakılması (Draggable Placement)
+  // Masadaki tüm kartların serbestçe sürüklenip bırakılması (Draggable Placement)
   const {
-    positions: stackPositions,
-    updatePosition: updateStackPosition,
-    resetAllPositions: resetAllStackPositions,
-  } = useDraggablePlacement();
+    positions: cardPositions,
+    updatePosition: updateCardPosition,
+  } = useDraggablePlacement({ storageKey: 'catankard_3p_card_positions' });
 
-  const [isCardDragging, setIsCardDragging] = useState(false);
-
+  const [, setIsCardDragging] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
@@ -75,26 +63,27 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
     : null;
 
-  const handleSelectBuild = (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
-    setBuildTargetCard({ card, source });
-  };
-
-  const handleConfirmBuildModal = async (substitution?: { replace: Resource; pay: Resource }) => {
-    if (!buildTargetCard) return;
-    const { card, source } = buildTargetCard;
+  const handleSelectBuild = async (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
+    if (!isActive) return;
     const cardType = source === 'row' ? (card as BuildingCard).type : 'metropolis';
 
     if (cardType === 'city' || cardType === 'metropolis') {
+      // Doğrudan yükseltme moduna geç (Hiçbir popup veya "İnşa Et" butonu çıkmaz)
       setPendingUpgrade({
         cardId: card.id,
         source,
         type: cardType,
-        substitution,
       });
       return;
     }
 
-    await onBuild(card.id, source, undefined, substitution);
+    // Yol, Şövalye, Köy: Doğrudan inşa et
+    try {
+      setLoading(true);
+      await onBuild(card.id, source);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConfirmUpgrade = async (stackId: string) => {
@@ -114,20 +103,38 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     }
   };
 
+  // Aktif Oyuncunun Bilgileri
   const youPlayer = view.players[view.you];
   const youArea = youPlayer?.area;
-  const youRoadRatio =
-    (youArea?.roads ?? 1) <= 1
-      ? '4:1'
-      : youArea?.roads === 2
-      ? '3:1'
-      : youArea?.roads === 3
-      ? '2:1'
-      : '1:1';
+  const youRoadsCount = Math.max(1, youArea?.roads ?? 1);
+  const youKnightsCount = youArea?.knights ?? 0;
+  const youHasRoute = view.longestRouteOwner === view.you;
+  const youHasArmy = view.largestArmyOwner === view.you;
+
+  // Rakiplerin Bilgileri
+  const oppLeftArea = oppLeft ? view.players[oppLeft]?.area : null;
+  const oppLeftRoadsCount = Math.max(1, oppLeftArea?.roads ?? 1);
+  const oppLeftKnightsCount = oppLeftArea?.knights ?? 0;
+  const oppLeftHasRoute = oppLeft ? view.longestRouteOwner === oppLeft : false;
+  const oppLeftHasArmy = oppLeft ? view.largestArmyOwner === oppLeft : false;
+
+  const oppRightArea = oppRight ? view.players[oppRight]?.area : null;
+  const oppRightRoadsCount = Math.max(1, oppRightArea?.roads ?? 1);
+  const oppRightKnightsCount = oppRightArea?.knights ?? 0;
+  const oppRightHasRoute = oppRight ? view.longestRouteOwner === oppRight : false;
+  const oppRightHasArmy = oppRight ? view.largestArmyOwner === oppRight : false;
+
+  // Toplam masa kartı sayısı (konumlandırma ve clamping hesapları için)
+  const totalYouCards =
+    (youArea?.stacks.length ?? 1) +
+    youRoadsCount +
+    youKnightsCount +
+    (youHasRoute ? 1 : 0) +
+    (youHasArmy ? 1 : 0);
 
   return (
     <div className="relative w-full min-h-screen bg-[#180103] flex flex-col justify-between overflow-hidden">
-      {/* 1. ÜST YÜZEN (FLOATING) MINIMAL OYUN BARI */}
+      {/* 1. ÜST YÜZEN MINIMAL OYUN BARI */}
       <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-4 py-2 shadow-2xl flex items-center justify-between transition-all">
         {/* Sol: Tur & Sıra */}
         <div className="flex items-center gap-3">
@@ -140,10 +147,10 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
             <span className="flex items-center gap-1.5 font-bold">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  isActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                  isActive ? 'bg-sky-400 animate-pulse' : 'bg-amber-400'
                 }`}
               />
-              <span className={isActive ? 'text-emerald-400' : 'text-amber-300'}>
+              <span className={isActive ? 'text-sky-300' : 'text-amber-300'}>
                 {view.players[view.activePlayerId]?.name || 'Oyuncu'}
               </span>
             </span>
@@ -165,7 +172,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 key={pid}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs transition-all ${
                   isTurn
-                    ? 'border-amber-400/90 bg-amber-950/60 text-amber-200 ring-1 ring-amber-400/40 font-bold'
+                    ? 'border-sky-400/90 bg-sky-950/80 text-sky-200 ring-2 ring-sky-400/50 shadow-[0_0_15px_rgba(56,189,248,0.5)] font-bold'
                     : 'border-slate-800 bg-slate-900/70 text-slate-300'
                 }`}
               >
@@ -210,19 +217,15 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
 
       {/* Yükseltme Bildirim Çubuğu */}
       {pendingUpgrade && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-amber-950/95 border-2 border-amber-400 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center gap-4 animate-bounce">
-          <span className="text-sm font-bold text-amber-200">
-            Masanızdan yükseltmek istediğiniz{' '}
-            <strong className="text-white uppercase underline">
-              {pendingUpgrade.type === 'city' ? 'Köyü' : 'Şehri'}
-            </strong>{' '}
-            seçin!
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-sky-950/95 border border-sky-400/80 rounded-xl px-4 py-1.5 shadow-2xl flex items-center gap-3 animate-in fade-in">
+          <span className="text-xs font-bold text-sky-200">
+            {pendingUpgrade.type === 'city' ? 'Köy' : 'Şehir'} seçin
           </span>
           <button
             onClick={() => setPendingUpgrade(null)}
-            className="text-xs bg-slate-900 hover:bg-slate-800 text-amber-300 px-3 py-1 rounded-lg border border-amber-600/50 font-bold"
+            className="text-xs bg-black/50 hover:bg-black text-slate-300 px-2 py-0.5 rounded border border-white/20 font-bold"
           >
-            İptal
+            ✕
           </button>
         </div>
       )}
@@ -231,84 +234,203 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
       <GameMat playerCount={3}>
         {/* Üst Alan: 2 Rakip Oyuncu */}
         <div className="w-full flex items-start justify-between gap-4 pt-10">
-          {/* Sol Rakip */}
+          {/* Sol Rakip (oppLeft) */}
           {oppLeft && (
-            <div className="flex flex-col items-start gap-2 relative">
-              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-xs border border-white/10 px-3 py-1.5 rounded-xl shadow-lg">
-                <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    view.activePlayerId === oppLeft ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
-                <span className="font-bold text-xs text-slate-100">
-                  {view.players[oppLeft]?.name}
-                </span>
-                <span className="text-[10px] text-yellow-400 font-extrabold bg-yellow-950/60 px-1.5 py-0.5 rounded border border-yellow-700/50">
-                  {view.players[oppLeft]?.visibleVP} ZP
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  🛣️ {view.players[oppLeft]?.area?.roads} | ⚔️ {view.players[oppLeft]?.area?.knights}
-                </span>
-              </div>
+            <div
+              className={`flex flex-col items-start gap-1.5 relative rounded-2xl p-2 transition-all duration-300 ${
+                view.activePlayerId === oppLeft
+                  ? 'ring-2 ring-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.4)] bg-sky-950/20'
+                  : ''
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                {/* Sol Rakip Eli & İsim Etiketi */}
+                <div className="flex flex-col items-start">
+                  <FannedHand
+                    cardCount={view.players[oppLeft]?.handCount ?? 0}
+                    isCurrentPlayer={false}
+                    corner="top-left"
+                    scale={0.85}
+                  />
+                  <div
+                    className={`mt-1 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                      view.activePlayerId === oppLeft
+                        ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
+                        : 'bg-black/50 text-slate-200 border border-white/10'
+                    }`}
+                  >
+                    <span>{view.players[oppLeft]?.name}</span>
+                    <span className="text-yellow-400 font-black">
+                      {view.players[oppLeft]?.visibleVP} ZP
+                    </span>
+                  </div>
+                </div>
 
-              {/* Sol Rakibin Kart Yelpazesi & Yığınları */}
-              <div className="flex items-start gap-4">
-                <FannedHand
-                  cardCount={view.players[oppLeft]?.handCount ?? 0}
-                  isCurrentPlayer={false}
-                  corner="top-left"
-                  scale={0.9}
-                />
-                <div className="flex flex-wrap gap-2.5 items-end max-w-sm">
-                  {view.players[oppLeft]?.area?.stacks.map((stack) => (
+                {/* Sol Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
+                <div className="flex flex-wrap gap-2 items-end max-w-md pt-1">
+                  {/* Settlement Stacks */}
+                  {oppLeftArea?.stacks.map((stack) => (
                     <CardStack
                       key={stack.id}
                       stack={stack}
                       onInspectCard={onInspectCard}
-                      scale={0.85}
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
                     />
                   ))}
+
+                  {/* Road Cards (1 Başlangıç Yolu + İnşa Edilen Yollar) */}
+                  {Array.from({ length: oppLeftRoadsCount }).map((_, i) => (
+                    <TableCard
+                      key={`${oppLeft}-road-${i}`}
+                      id={`${oppLeft}-road-${i}`}
+                      type="road"
+                      isStarting={i === 0}
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('road')}
+                    />
+                  ))}
+
+                  {/* Knight Cards */}
+                  {Array.from({ length: oppLeftKnightsCount }).map((_, i) => (
+                    <TableCard
+                      key={`${oppLeft}-knight-${i}`}
+                      id={`${oppLeft}-knight-${i}`}
+                      type="knight"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('knight')}
+                    />
+                  ))}
+
+                  {/* Bonus Kartlar */}
+                  {oppLeftHasRoute && (
+                    <TableCard
+                      key={`${oppLeft}-bonus-longest-route`}
+                      id={`${oppLeft}-bonus-longest-route`}
+                      type="longest_route"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('longest_route')}
+                    />
+                  )}
+                  {oppLeftHasArmy && (
+                    <TableCard
+                      key={`${oppLeft}-bonus-largest-army`}
+                      id={`${oppLeft}-bonus-largest-army`}
+                      type="largest_army"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('largest_army')}
+                    />
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Sağ Rakip */}
+          {/* Sağ Rakip (oppRight) */}
           {oppRight && (
-            <div className="flex flex-col items-end gap-2 relative">
-              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-xs border border-white/10 px-3 py-1.5 rounded-xl shadow-lg">
-                <span className="text-[10px] text-slate-400">
-                  ⚔️ {view.players[oppRight]?.area?.knights} | 🛣️ {view.players[oppRight]?.area?.roads}
-                </span>
-                <span className="text-[10px] text-yellow-400 font-extrabold bg-yellow-950/60 px-1.5 py-0.5 rounded border border-yellow-700/50">
-                  {view.players[oppRight]?.visibleVP} ZP
-                </span>
-                <span className="font-bold text-xs text-slate-100">
-                  {view.players[oppRight]?.name}
-                </span>
-                <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    view.activePlayerId === oppRight ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
-              </div>
+            <div
+              className={`flex flex-col items-end gap-1.5 relative rounded-2xl p-2 transition-all duration-300 ${
+                view.activePlayerId === oppRight
+                  ? 'ring-2 ring-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.4)] bg-sky-950/20'
+                  : ''
+              }`}
+            >
+              <div className="flex items-start gap-3 flex-row-reverse">
+                {/* Sağ Rakip Eli & İsim Etiketi */}
+                <div className="flex flex-col items-end">
+                  <FannedHand
+                    cardCount={view.players[oppRight]?.handCount ?? 0}
+                    isCurrentPlayer={false}
+                    corner="top-right"
+                    scale={0.85}
+                  />
+                  <div
+                    className={`mt-1 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                      view.activePlayerId === oppRight
+                        ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
+                        : 'bg-black/50 text-slate-200 border border-white/10'
+                    }`}
+                  >
+                    <span>{view.players[oppRight]?.name}</span>
+                    <span className="text-yellow-400 font-black">
+                      {view.players[oppRight]?.visibleVP} ZP
+                    </span>
+                  </div>
+                </div>
 
-              <div className="flex items-start gap-4 flex-row-reverse">
-                <FannedHand
-                  cardCount={view.players[oppRight]?.handCount ?? 0}
-                  isCurrentPlayer={false}
-                  corner="top-right"
-                  scale={0.9}
-                />
-                <div className="flex flex-wrap gap-2.5 items-end justify-end max-w-sm">
-                  {view.players[oppRight]?.area?.stacks.map((stack) => (
+                {/* Sağ Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
+                <div className="flex flex-wrap gap-2 items-end justify-end max-w-md pt-1">
+                  {/* Settlement Stacks */}
+                  {oppRightArea?.stacks.map((stack) => (
                     <CardStack
                       key={stack.id}
                       stack={stack}
                       onInspectCard={onInspectCard}
-                      scale={0.85}
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
                     />
                   ))}
+
+                  {/* Road Cards */}
+                  {Array.from({ length: oppRightRoadsCount }).map((_, i) => (
+                    <TableCard
+                      key={`${oppRight}-road-${i}`}
+                      id={`${oppRight}-road-${i}`}
+                      type="road"
+                      isStarting={i === 0}
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('road')}
+                    />
+                  ))}
+
+                  {/* Knight Cards */}
+                  {Array.from({ length: oppRightKnightsCount }).map((_, i) => (
+                    <TableCard
+                      key={`${oppRight}-knight-${i}`}
+                      id={`${oppRight}-knight-${i}`}
+                      type="knight"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('knight')}
+                    />
+                  ))}
+
+                  {/* Bonus Kartlar */}
+                  {oppRightHasRoute && (
+                    <TableCard
+                      key={`${oppRight}-bonus-longest-route`}
+                      id={`${oppRight}-bonus-longest-route`}
+                      type="longest_route"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('longest_route')}
+                    />
+                  )}
+                  {oppRightHasArmy && (
+                    <TableCard
+                      key={`${oppRight}-bonus-largest-army`}
+                      id={`${oppRight}-bonus-largest-army`}
+                      type="largest_army"
+                      scale={0.78}
+                      baseWidth={125}
+                      baseHeight={186}
+                      onInspect={() => onInspectCard('largest_army')}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -316,7 +438,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         </div>
 
         {/* Orta Alan: BUILDING ROW MAT */}
-        <div className="my-auto flex justify-center w-full">
+        <div className="my-auto flex justify-center w-full z-10">
           <BuildingRowMat
             view={view}
             onInspectCard={onInspectCard}
@@ -326,37 +448,18 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           />
         </div>
 
-        {/* Alt Alan: Kendi Masan (Güvenli Masa Alanı & Fanned Hand) */}
-        <div className="w-full flex flex-col items-center gap-2 pb-[230px] relative">
-          {/* Güvenli Masa Yerleşim Çizgisi ve Düzeni Sıfırla Düğmesi */}
-          <div
-            className={`w-full max-w-4xl flex items-center justify-between px-4 mb-1 transition-opacity duration-300 ${
-              isCardDragging || Object.keys(stackPositions).length > 0
-                ? 'opacity-100'
-                : 'opacity-40 hover:opacity-100'
-            }`}
-          >
-            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-black/60 backdrop-blur-xs border border-amber-500/30 text-[11px] text-amber-300">
-              <ShieldCheck size={13} className="text-emerald-400" />
-              <span>Güvenli Masa Alanı (Yerleşimleriniz)</span>
-            </div>
-
-            {Object.keys(stackPositions).length > 0 && (
-              <button
-                type="button"
-                onClick={resetAllStackPositions}
-                title="Kartları varsayılan kavisli sıraya diz"
-                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-600/40 text-xs shadow-lg transition active:scale-95"
-              >
-                <RotateCcw size={11} />
-                <span>Düzeni Sıfırla</span>
-              </button>
-            )}
-          </div>
-
-          {/* Yerleşim Yığınların (Settlement / City / Metropolis) */}
-          <div className="flex items-end justify-center gap-4 sm:gap-6 flex-wrap">
-            {youArea?.stacks.map((stack, index, arr) => {
+        {/* Alt Alan: Kendi Masan (Table Cards & Bottom Hand) */}
+        <div
+          className={`w-full flex flex-col items-center justify-end relative rounded-2xl p-2 transition-all duration-300 pb-1 ${
+            isActive
+              ? 'ring-2 ring-sky-400/80 shadow-[0_0_35px_rgba(56,189,248,0.35)] bg-sky-950/15'
+              : ''
+          }`}
+        >
+          {/* 1. Masadaki Fiziksel Kartlar (Settlement/City stacks, Road cards, Knight cards, Bonus cards) */}
+          <div className="w-full flex items-end justify-center gap-3 sm:gap-4 flex-wrap mb-4 z-20">
+            {/* Settlement Stacks (Köy -> Şehir -> Büyükşehir) */}
+            {youArea?.stacks.map((stack, index) => {
               const isSettlement = stack.top === 'settlement';
               const isCity = stack.top === 'city';
 
@@ -365,78 +468,170 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
               const isSelected = selectedStackId === stack.id;
 
-              const mid = (arr.length - 1) / 2;
-              const arcOffset = -Math.abs(index - mid) * 6;
-
               const clampFn = createSafeZoneClamper({
                 layout: '3P',
                 handPosition: 'bottom-center',
                 slotIndex: index,
-                totalSlots: arr.length,
-                cardWidth: 110,
+                totalSlots: totalYouCards,
+                cardWidth: 125,
               });
 
               return (
-                <div
+                <CardStack
                   key={stack.id}
-                  style={{
-                    transform: stackPositions[stack.id] ? undefined : `translateY(${arcOffset}px)`,
-                    transition: 'transform 0.2s ease',
-                  }}
-                >
-                  <CardStack
-                    stack={stack}
-                    isSelectable={isSelectable}
-                    isSelected={isSelected}
-                    onSelect={handleConfirmUpgrade}
-                    onInspectCard={onInspectCard}
-                    scale={1.0}
-                    isDraggable={true}
-                    position={stackPositions[stack.id]}
-                    onPositionChange={(pos) => updateStackPosition(stack.id, pos)}
-                    onDragChange={setIsCardDragging}
-                    clampPosition={clampFn}
-                  />
-                </div>
+                  stack={stack}
+                  isSelectable={isSelectable}
+                  isSelected={isSelected}
+                  onSelect={handleConfirmUpgrade}
+                  onInspectCard={onInspectCard}
+                  scale={1.0}
+                  baseWidth={125}
+                  baseHeight={186}
+                  isDraggable={true}
+                  position={cardPositions[stack.id]}
+                  onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
+                  onDragChange={setIsCardDragging}
+                  clampPosition={clampFn}
+                />
               );
             })}
+
+            {/* Road Cards (1 Başlangıç Yolu + İnşa Edilen Yollar) */}
+            {Array.from({ length: youRoadsCount }).map((_, i) => {
+              const cardId = `you-road-${i}`;
+              const slotIdx = (youArea?.stacks.length ?? 1) + i;
+              const clampFn = createSafeZoneClamper({
+                layout: '3P',
+                handPosition: 'bottom-center',
+                slotIndex: slotIdx,
+                totalSlots: totalYouCards,
+                cardWidth: 125,
+              });
+
+              return (
+                <TableCard
+                  key={cardId}
+                  id={cardId}
+                  type="road"
+                  isStarting={i === 0}
+                  scale={1.0}
+                  baseWidth={125}
+                  baseHeight={186}
+                  isDraggable={true}
+                  position={cardPositions[cardId]}
+                  onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                  onDragChange={setIsCardDragging}
+                  clampPosition={clampFn}
+                  onInspect={() => onInspectCard('road')}
+                />
+              );
+            })}
+
+            {/* Knight Cards (İnşa Edilen Şövalyeler) */}
+            {Array.from({ length: youKnightsCount }).map((_, i) => {
+              const cardId = `you-knight-${i}`;
+              const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
+              const clampFn = createSafeZoneClamper({
+                layout: '3P',
+                handPosition: 'bottom-center',
+                slotIndex: slotIdx,
+                totalSlots: totalYouCards,
+                cardWidth: 125,
+              });
+
+              return (
+                <TableCard
+                  key={cardId}
+                  id={cardId}
+                  type="knight"
+                  scale={1.0}
+                  baseWidth={125}
+                  baseHeight={186}
+                  isDraggable={true}
+                  position={cardPositions[cardId]}
+                  onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                  onDragChange={setIsCardDragging}
+                  clampPosition={clampFn}
+                  onInspect={() => onInspectCard('knight')}
+                />
+              );
+            })}
+
+            {/* Bonus Kartlar (En Uzun Yol & En Güçlü Ordu) */}
+            {youHasRoute && (
+              <TableCard
+                key="bonus-longest-route"
+                id="bonus-longest-route"
+                type="longest_route"
+                scale={1.0}
+                baseWidth={125}
+                baseHeight={186}
+                isDraggable={true}
+                position={cardPositions['bonus-longest-route']}
+                onPositionChange={(pos) => updateCardPosition('bonus-longest-route', pos)}
+                onDragChange={setIsCardDragging}
+                clampPosition={createSafeZoneClamper({
+                  layout: '3P',
+                  handPosition: 'bottom-center',
+                  slotIndex: totalYouCards - 1,
+                  totalSlots: totalYouCards,
+                  cardWidth: 125,
+                })}
+                onInspect={() => onInspectCard('longest_route')}
+              />
+            )}
+            {youHasArmy && (
+              <TableCard
+                key="bonus-largest-army"
+                id="bonus-largest-army"
+                type="largest_army"
+                scale={1.0}
+                baseWidth={125}
+                baseHeight={186}
+                isDraggable={true}
+                position={cardPositions['bonus-largest-army']}
+                onPositionChange={(pos) => updateCardPosition('bonus-largest-army', pos)}
+                onDragChange={setIsCardDragging}
+                clampPosition={createSafeZoneClamper({
+                  layout: '3P',
+                  handPosition: 'bottom-center',
+                  slotIndex: totalYouCards - 1,
+                  totalSlots: totalYouCards,
+                  cardWidth: 125,
+                })}
+                onInspect={() => onInspectCard('largest_army')}
+              />
+            )}
           </div>
 
-          {/* Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi */}
-          <div className="w-full flex justify-center -mt-2">
+          {/* 2. Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi & Altında Sadece [İsim] [ZP] */}
+          <div className="w-full flex flex-col items-center z-10">
             <FannedHand
               hand={view.yourHand}
               isCurrentPlayer={true}
               corner="bottom-center"
               onInspectCard={onInspectCard}
-              scale={1.1}
+              scale={1.05}
             />
+            <div
+              className={`mt-1 flex items-center gap-1.5 px-3 py-0.5 rounded-lg text-xs font-bold transition-all ${
+                isActive
+                  ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
+                  : 'bg-black/50 text-slate-200 border border-white/10'
+              }`}
+            >
+              <span>{youPlayer?.name || 'Sen'}</span>
+              <span className="text-yellow-400 font-black">
+                {youPlayer?.visibleVP} ZP
+              </span>
+            </div>
           </div>
         </div>
       </GameMat>
 
-      {/* Sürükleme Sırasında Görsel Yasak Bölge (Hand Zone) Göstergesi */}
-      {isCardDragging && (
-        <div
-          style={{
-            width: `${HAND_ZONE_CONFIG.CENTER_WIDTH}px`,
-            height: `${HAND_ZONE_CONFIG.HEIGHT}px`,
-          }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-2xl border-2 border-dashed border-red-500/80 bg-red-950/40 backdrop-blur-xs flex flex-col items-center justify-start pt-3 pointer-events-none z-30 transition-all animate-pulse"
-        >
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/95 border border-red-500/70 shadow-lg text-red-200 text-xs font-bold">
-            <Ban size={14} className="text-red-400" />
-            <span>Yasak Bölge (El Kartları) • Buraya Kart Konamaz</span>
-          </div>
-          <span className="text-[10px] text-red-300/80 mt-1">
-            Masa kartları elinizin üstündeki güvenli bölgeye otomatik yaslanır
-          </span>
-        </div>
-      )}
-
-      {/* 3. ALT YÜZEN (FLOATING) MINIMAL AKSİYON BARI */}
+      {/* 3. ALT YÜZEN MINIMAL AKSİYON BARI */}
       <footer className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center justify-between">
-        {/* Sol Aksiyon: Ticaret / Takas & İstatistikler */}
+        {/* Sol Aksiyon: Ticaret / Takas */}
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenTrade}
@@ -450,19 +645,6 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               </span>
             )}
           </button>
-
-          {/* Oyuncu Durum Rozetleri */}
-          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-300 bg-slate-900/80 px-3 py-1 rounded-lg border border-slate-800">
-            <div className="flex items-center gap-1" title="Yol Takas Oranı">
-              <Milestone size={13} className="text-amber-400" />
-              <span>Yollar ({youArea?.roads}): <strong>{youRoadRatio}</strong></span>
-            </div>
-            <span className="text-slate-700">|</span>
-            <div className="flex items-center gap-1" title="Şövalye Sayısı & Hırsız Koruma Limiti">
-              <Shield size={13} className="text-blue-400" />
-              <span>Şövalye: <strong>{youArea?.knights}</strong> (+{youArea?.knights} limit)</span>
-            </div>
-          </div>
         </div>
 
         {/* Sağ Aksiyon: Turu Bitir */}
@@ -477,24 +659,15 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               <span>Turu Bitir</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2 text-xs text-amber-200/70 italic bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
-              <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <div className="flex items-center gap-2 text-xs text-sky-200/80 italic bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
+              <div className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
               <span>{view.players[view.activePlayerId]?.name || 'Diğer oyuncu'} oynuyor...</span>
             </div>
           )}
         </div>
       </footer>
-
-      {/* İnşaat Onay Modalı */}
-      {buildTargetCard && (
-        <BuildModal
-          card={buildTargetCard.card}
-          source={buildTargetCard.source}
-          view={view}
-          onClose={() => setBuildTargetCard(null)}
-          onConfirm={handleConfirmBuildModal}
-        />
-      )}
     </div>
   );
 };
+
+export default GameDesk3P;
