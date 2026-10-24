@@ -83,7 +83,7 @@ export const CardStack: React.FC<CardStackProps> = ({
   const cardH = Math.round(baseHeight * effectiveScale);
   const offset = Math.round(layerOffset * effectiveScale);
 
-  const { top, metropolis, isStarting, isStartingPlayerCard } = stack;
+  const { top, metropolis } = stack;
   const hasCity = top === 'city' || top === 'metropolis';
   const hasMetropolis = top === 'metropolis';
 
@@ -91,13 +91,8 @@ export const CardStack: React.FC<CardStackProps> = ({
   const layerCount = hasMetropolis ? 3 : hasCity ? 2 : 1;
   const totalHeight = cardH + (layerCount - 1) * offset;
 
-  // Başlangıç köyü resmi
+  // Köy kartı resmi (Masada her zaman orijinal köy kartı kullanılır)
   const getSettlementImgUrl = (): string => {
-    if (isStarting) {
-      return isStartingPlayerCard
-        ? '/assets/cards/starting/starting_settlement_front_starting_player.png'
-        : '/assets/cards/starting/starting_settlement_front.png';
-    }
     return getBuildingImageUrl('settlement');
   };
 
@@ -287,12 +282,6 @@ export const CardStack: React.FC<CardStackProps> = ({
             (e.currentTarget as HTMLElement).style.display = 'none';
           }}
         />
-        {/* Başlangıç köyü (ilk oyuncu olmayan) için parşömen metni */}
-        {isStarting && !isStartingPlayerCard && (
-          <div className="absolute bottom-[18px] sm:bottom-[22px] inset-x-0 text-center font-bold text-stone-900 text-xs sm:text-sm tracking-wide select-none pointer-events-none">
-            İlk Köy
-          </div>
-        )}
       </div>
 
       {/* 2. KATMAN: ŞEHİR KARTI (Köyün üstüne offset px aşağı kaydırılarak biner) */}
