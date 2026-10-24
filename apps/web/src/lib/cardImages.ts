@@ -5,29 +5,30 @@ import type {
   MetropolisCard,
   Resource,
 } from '@catankard/engine';
+import { assetUrl } from './assetUrl.ts';
 
 export function getResourceImageUrl(resource: Resource): string {
-  return `/assets/cards/resource/resource_${resource}.png`;
+  return assetUrl(`/assets/cards/resource/resource_${resource}.png`);
 }
 
 export function getBuildingImageUrl(type: BuildingType): string {
-  return `/assets/cards/building/building_${type}.png`;
+  return assetUrl(`/assets/cards/building/building_${type}.png`);
 }
 
 export function getMetropolisImageUrl(card: MetropolisCard): string {
   if (card.side === 'A') {
-    return '/assets/cards/building/metropolis_A.png';
+    return assetUrl('/assets/cards/building/metropolis_A.png');
   }
   const kind = card.kind ?? 'knights';
-  return `/assets/cards/building/metropolis_B_${kind}.png`;
+  return assetUrl(`/assets/cards/building/metropolis_B_${kind}.png`);
 }
 
 export function getEventImageUrl(kind: EventKind): string {
-  return `/assets/cards/event/event_${kind}.png`;
+  return assetUrl(`/assets/cards/event/event_${kind}.png`);
 }
 
 export function getBonusImageUrl(bonus: 'longest_route' | 'largest_army'): string {
-  return `/assets/cards/bonus/bonus_${bonus}.png`;
+  return assetUrl(`/assets/cards/bonus/bonus_${bonus}.png`);
 }
 
 export interface CostItem {
@@ -46,7 +47,7 @@ export interface CardDetails {
   imageUrl: string;
 }
 
-export function getCardDetails(
+function getRawCardDetails(
   type: BuildingType | 'metropolis' | EventKind | 'longest_route' | 'largest_army' | Resource,
   subKind?: MetropolisBKind
 ): CardDetails {
@@ -285,3 +286,15 @@ export function getCardDetails(
       };
   }
 }
+
+export function getCardDetails(
+  type: BuildingType | 'metropolis' | EventKind | 'longest_route' | 'largest_army' | Resource,
+  subKind?: MetropolisBKind
+): CardDetails {
+  const details = getRawCardDetails(type, subKind);
+  return {
+    ...details,
+    imageUrl: assetUrl(details.imageUrl),
+  };
+}
+

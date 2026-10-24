@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Resource, ResourceCounts } from '@catankard/engine';
 import { getResourceImageUrl } from '../lib/cardImages.ts';
+import { assetUrl } from '../lib/assetUrl.ts';
 
 export interface FannedHandProps {
   /** Kaynak kartları listesi (örn: ['brick', 'brick', 'wood', 'wool', 'ore']) */
@@ -149,23 +150,44 @@ export const FannedHand: React.FC<FannedHandProps> = ({
   const cardW = baseW * scale;
   const cardH = baseH * scale;
 
-  const isCenter = activeCorner === 'bottom-center';
+  const isBottomFan =
+    activeCorner === 'bottom-center' ||
+    (activeCorner === 'bottom-right' && !isOpponentHand);
+  const isCornerArc =
+    activeCorner === 'top-left' ||
+    activeCorner === 'top-right' ||
+    activeCorner === 'bottom-left' ||
+    (activeCorner === 'bottom-right' && isOpponentHand);
   const mid = (totalCards - 1) / 2;
 
-  // Yelpaze aralıkları: Kartların birbirinin üzerine doğal şekilde binmesi
-  const overlapSpacing = isCenter ? (compact ? 22 : 36) * scale : (compact ? 16 : 24) * scale;
-  const arcStepY = (compact ? 3 : 5) * scale;
+  // Yelpaze aralıkları: Kartların birbirinin üzerine doğal ve homojen şekilde binmesi
+  const maxHandSpan = (compact ? 260 : 420) * scale;
+  const bottomFanOverlapSpacing =
+    totalCards <= 1
+      ? 0
+      : Math.min((compact ? 22 : 36) * scale, maxHandSpan / Math.max(1, totalCards - 1));
+
+  // Köşelerdeki rakip yelpazeleri için referans görseldeki gibi sıkışık, doğal kavisli örtüşme
+  const maxCornerFanSpan = (compact ? 130 : 180) * scale;
+  const opponentOverlapSpacing =
+    totalCards <= 1
+      ? 0
+      : Math.min((compact ? 15 : 20) * scale, maxCornerFanSpan / Math.max(1, totalCards - 1));
 
   // Konteyner boyutları
   let containerWidth: number;
   let containerHeight: number;
 
-  if (isCenter) {
-    containerWidth = Math.round(cardW + (totalCards - 1) * overlapSpacing + 48);
+  if (isBottomFan) {
+    containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + 48);
     containerHeight = Math.round(cardH + (compact ? 28 : 50) * scale);
+  } else if (isCornerArc) {
+    const arcExtraW = totalCards > 1 ? (compact ? 26 : 38) * scale : 8;
+    containerWidth = Math.round(cardW + (totalCards - 1) * opponentOverlapSpacing + arcExtraW + 16);
+    containerHeight = Math.round(cardH + (compact ? 20 : 32) * scale + 16);
   } else {
-    containerWidth = Math.round(cardW + (totalCards - 1) * overlapSpacing + 16);
-    containerHeight = Math.round(cardH + (compact ? 14 : 20) * scale + 16);
+    containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + 48);
+    containerHeight = Math.round(cardH + (compact ? 28 : 50) * scale);
   }
 
   // Hizalama konteyner sınıfları (Sadece align açıkça belirtildiyse fixed konumu kullan)
@@ -216,21 +238,23 @@ export const FannedHand: React.FC<FannedHandProps> = ({
           let zIndex = i + 1;
           let currentScale = 1;
 
-          // Açı hesaplaması: -10° ile +10° arası doğal, hafif kavis
-          const maxSpread = compact ? 18 : 22;
-          const stepAngle =
-            totalCards <= 1
-              ? 0
-              : Math.min(compact ? 4 : 5, maxSpread / Math.max(1, totalCards - 1));
+          // Açı hesaplaması:
+          // Köşe elleri için (top-left, top-right, bottom-left) referans görseldeki LoR tarzı yay/kavis (arc fan) matematiği:
+          // - İlk kart köşede neredeyse dik (0° meyil)
+          // - Sonraki kartlar yay şeklinde artan açıyla masaya doğru açılır (0°, 6°, 13°, 21°, 30°, 40°, 48°)
+          // - Doğal bir kavis sağlamak için açı adımı üstel progress^1.15 ile genişler
+          const cornerProgress = totalCards > 1 ? i / (totalCards - 1) : 0;
+          const maxFanAngle = totalCards <= 1 ? 0 : Math.min(48, (totalCards - 1) * 8);
+          const cornerArcAngle = maxFanAngle * Math.pow(cornerProgress, 1.15);
 
           if (activeCorner === 'top-left') {
-            // Sol üst köşe: Karşında oturan oyuncu elinde kart tutuyor gibi,
-            // kartlar masanın merkezine hafifçe bakacak şekilde (+2° hafif meyil)
-            transformOrigin = 'bottom center';
-            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle + 2;
-            const arcY = Math.abs(i - mid) * arcStepY;
-            translateX = i * overlapSpacing;
+            // Sol üst köşe: Kartlar sol üstten başlayarak masanın merkezine doğru kavis çizer
+            transformOrigin = '20% 0%';
+            baseRotation = -cornerArcAngle;
+            const arcY = Math.pow(cornerProgress, 1.4) * (compact ? 16 : 24) * scale;
+            translateX = i * opponentOverlapSpacing;
             translateY = arcY;
+            zIndex = i + 1;
             cardPositionStyle = {
               top: '8px',
               left: '8px',
@@ -238,94 +262,80 @@ export const FannedHand: React.FC<FannedHandProps> = ({
 
             if (isHovered && !isOpponentHand) {
               translateY += 10;
-              currentScale = 1.15;
+              currentScale = 1.08;
               zIndex = 50;
             }
           } else if (activeCorner === 'top-right') {
-            // Sağ üst köşe: Masanın merkezine hafifçe bakacak şekilde (-2° hafif meyil)
-            transformOrigin = 'bottom center';
-            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle - 2;
-            const arcY = Math.abs(i - mid) * arcStepY;
-            translateX = i * overlapSpacing;
+            // Sağ üst köşe: Sol üstün ayna simetriği, kartlar sağ üstten masanın merkezine doğru açılır
+            transformOrigin = '80% 0%';
+            baseRotation = cornerArcAngle;
+            const arcY = Math.pow(cornerProgress, 1.4) * (compact ? 16 : 24) * scale;
+            translateX = -i * opponentOverlapSpacing;
             translateY = arcY;
+            zIndex = i + 1;
             cardPositionStyle = {
               top: '8px',
-              left: '8px',
+              right: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
               translateY += 10;
-              currentScale = 1.15;
+              currentScale = 1.08;
               zIndex = 50;
             }
           } else if (activeCorner === 'bottom-left') {
-            transformOrigin = 'bottom center';
-            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle + 2;
-            const arcY = Math.abs(i - mid) * arcStepY;
-            translateX = i * overlapSpacing;
+            // Sol alt köşe: Kartlar alttan masanın merkezine doğru kavisle yükselerek açılır
+            transformOrigin = '20% 100%';
+            baseRotation = cornerArcAngle;
+            const arcY = Math.pow(cornerProgress, 1.4) * (compact ? 12 : 18) * scale;
+            translateX = i * opponentOverlapSpacing;
             translateY = -arcY;
+            zIndex = i + 1;
             cardPositionStyle = {
               bottom: '8px',
               left: '8px',
             };
 
             if (isHovered && !isOpponentHand) {
-              translateY -= 16;
-              currentScale = 1.15;
+              translateY -= compact ? 18 : 26;
+              currentScale = 1.08;
               zIndex = 50;
             }
-          } else if (activeCorner === 'bottom-right') {
-            transformOrigin = 'bottom center';
-            baseRotation = totalCards <= 1 ? 0 : (i - mid) * stepAngle - 2;
-            const arcY = Math.abs(i - mid) * arcStepY;
-            translateX = i * overlapSpacing;
+          } else if (activeCorner === 'bottom-right' && isOpponentHand) {
+            // Sağ alt köşede rakip eli olursa: masanın merkezine doğru kavis
+            transformOrigin = '80% 100%';
+            baseRotation = -cornerArcAngle;
+            const arcY = Math.pow(cornerProgress, 1.4) * (compact ? 12 : 18) * scale;
+            translateX = -i * opponentOverlapSpacing;
             translateY = -arcY;
+            zIndex = i + 1;
             cardPositionStyle = {
               bottom: '8px',
-              left: '8px',
+              right: '8px',
             };
-
-            if (isHovered && !isOpponentHand) {
-              translateY -= 16;
-              currentScale = 1.15;
-              zIndex = 50;
-            } else if (isSelected) {
-              translateY -= 12;
-              zIndex = 40;
-            }
           } else {
-            // bottom-center (aktif oyuncunun merkezdeki eli veya varsayılan)
+            // Aktif oyuncu eli: bottom-center (3P) ve bottom-right (4P) modlarında
+            // homojen, akıcı, zıplama olmadan kusursuz gezinme deneyimi
             transformOrigin = 'bottom center';
-            const maxCenterSpread = compact ? 24 : 34;
-            const centerAngleStep =
+            const maxSpread = compact ? 20 : 28;
+            const angleStep =
               totalCards <= 1
                 ? 0
-                : Math.min(compact ? 5 : 6.5, maxCenterSpread / Math.max(1, totalCards - 1));
-            baseRotation = (i - mid) * centerAngleStep;
+                : Math.min(compact ? 4.5 : 5.5, maxSpread / Math.max(1, totalCards - 1));
+            baseRotation = (i - mid) * angleStep;
 
-            const arcY = Math.abs(i - mid) * (compact ? 4 : 7) * scale;
+            const arcStep = (compact ? 2.5 : 4) * scale;
+            const arcY = Math.abs(i - mid) * arcStep;
 
-            // Komşuların hafifçe iki yana aralanması (nudge effect)
-            let neighborShiftX = 0;
-            if (hoveredIndex !== null && !isHovered) {
-              const distance = Math.abs(i - hoveredIndex);
-              const spreadForce = Math.max(6, (compact ? 12 : 20) - distance * 3);
-              if (i < hoveredIndex) {
-                neighborShiftX = -spreadForce;
-              } else if (i > hoveredIndex) {
-                neighborShiftX = spreadForce;
-              }
-            }
-
-            translateX = (i - mid) * overlapSpacing + neighborShiftX;
+            translateX = (i - mid) * bottomFanOverlapSpacing;
             translateY = arcY;
 
             if (isHovered && !isOpponentHand) {
-              translateY = arcY - (compact ? 22 : 32);
-              currentScale = 1.15;
+              translateY -= compact ? 18 : 26;
+              currentScale = 1.08;
               zIndex = 50;
             } else if (isSelected) {
-              translateY = arcY - (compact ? 16 : 24);
+              translateY -= compact ? 12 : 16;
               zIndex = 40;
             }
 
@@ -337,7 +347,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
           }
 
           // Kart arkası görseli
-          const backImageSrc = '/assets/cards/back/resource_back.png';
+          const backImageSrc = assetUrl('/assets/cards/back/resource_back.png');
           // Kart ön yüz görseli
           const frontImageSrc = res ? getResourceImageUrl(res) : backImageSrc;
 
@@ -371,35 +381,38 @@ export const FannedHand: React.FC<FannedHandProps> = ({
                 zIndex,
                 transformOrigin,
                 transition:
-                  'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease',
+                  'transform 0.18s cubic-bezier(0.2, 0.8, 0.35, 1), box-shadow 0.18s ease',
               }}
-              className={`absolute cursor-pointer rounded-xl overflow-hidden shadow-md group ${
+              className={`absolute cursor-pointer rounded-xl overflow-hidden group ${
                 isHovered
                   ? 'shadow-2xl shadow-black/80 ring-2 ring-amber-400'
                   : isSelected
                   ? 'shadow-xl shadow-amber-500/40 ring-2 ring-yellow-400 ring-offset-2 ring-offset-slate-900'
-                  : 'shadow-black/60'
+                  : isOpponentHand
+                  ? 'shadow-xl shadow-black/75 border border-white/20 hover:border-white/40'
+                  : 'shadow-md shadow-black/60'
               } ${disabled ? 'cursor-not-allowed opacity-80' : ''}`}
             >
               {/* Kart İçeriği */}
               {isOpponentHand || !res ? (
-                /* RAKİP KARTI - ARKASI DÖNÜK CATAN DESENİ (Bize bakacak şekilde dik ve doğal) */
-                <div className="relative w-full h-full bg-gradient-to-br from-amber-950 via-slate-900 to-amber-950 border-2 border-amber-600/70 rounded-xl overflow-hidden flex items-center justify-center">
+                /* RAKİP KARTI - ARKASI DÖNÜK CATAN DESENİ (Bize bakacak şekilde doğal ve derinlikli yay dizilimi) */
+                <div className="relative w-full h-full bg-gradient-to-br from-amber-950 via-slate-900 to-amber-950 rounded-xl overflow-hidden flex items-center justify-center">
                   <img
                     src={backImageSrc}
                     alt="Catan Kartı"
-                    className="w-full h-full object-cover select-none pointer-events-none"
+                    className="w-full h-full object-cover select-none pointer-events-none drop-shadow-sm"
                     onError={(e) => {
                       const img = e.currentTarget;
                       if (!img.src.includes('resource_back.png')) {
-                        img.src = '/assets/cards/resource/resource_back.png';
+                        img.src = assetUrl('/assets/cards/resource/resource_back.png');
                       } else {
                         img.style.display = 'none';
                       }
                     }}
                   />
-                  <div className="absolute inset-0 bg-radial-gradient pointer-events-none border border-amber-400/20 rounded-xl" />
-                  <div className="absolute inset-1 border border-amber-500/30 rounded-lg pointer-events-none" />
+                  {/* Kart arkası zarif parlama ve kenar derinliği */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/15 pointer-events-none rounded-xl" />
+                  <div className="absolute inset-0 pointer-events-none border border-amber-400/30 rounded-xl shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]" />
                 </div>
               ) : (
                 /* AKTİF OYUNCU KARTI - AÇIK KAYNAK (Üzerinde metin yok, saf kart görseli) */

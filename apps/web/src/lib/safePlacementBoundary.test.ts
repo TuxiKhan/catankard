@@ -1,67 +1,135 @@
 import { describe, it, expect } from 'vitest';
-import { createSafeZoneClamper, HAND_ZONE_CONFIG } from './safePlacementBoundary.ts';
+import {
+  createSafeZoneClamper,
+  clampPositionToViewport,
+} from './safePlacementBoundary.ts';
 
-describe('safePlacementBoundary Clamping & Hand Occlusion Prevention', () => {
-  it('prevents cards from entering the central hand zone in 3P (clamps y to safe boundary)', () => {
+describe('safePlacementBoundary Clamping & Viewport Restrictions', () => {
+  it('enforces strict boundary clamping for table zone (minX=-140, maxX=100, minY=-75, maxY=45)', () => {
     const clamper = createSafeZoneClamper({
       layout: '3P',
-      handPosition: 'bottom-center',
-      slotIndex: 0,
-      totalSlots: 1,
-      cardWidth: 110,
     });
 
-    // 1. Trying to drag card downwards into the hand zone (y > 20)
-    const resultDown = clamper({ x: 0, y: 50 });
-    expect(resultDown.y).toBe(20); // Clamped to narrowed safe border (y <= 20)
+    const resultMid = clamper({ x: 0, y: 20 });
+    expect(resultMid.x).toBe(0);
+    expect(resultMid.y).toBe(20);
 
-    const resultFarDown = clamper({ x: 0, y: 150 });
-    expect(resultFarDown.y).toBe(20);
+    const resultUp = clamper({ x: 0, y: -40 });
+    expect(resultUp.y).toBe(-40);
 
-    // 2. Dragging card upwards into free table area (y < 0) is allowed
-    const resultUp = clamper({ x: 0, y: -60 });
-    expect(resultUp.y).toBe(-60);
+    // Extreme upward movement is strictly bound to minY = -75
+    const resultTooFarUp = clamper({ x: 0, y: -400 });
+    expect(resultTooFarUp.y).toBe(-75);
 
-    // 3. Masanın çok yukarısına (Bina dizisi üstüne) taşmayı engeller
-    const resultTooFarUp = clamper({ x: 0, y: -300 });
-    expect(resultTooFarUp.y).toBe(-280);
+    // Extreme downward movement is strictly bound to maxY = 45
+    const resultTooFarDown = clamper({ x: 0, y: 300 });
+    expect(resultTooFarDown.y).toBe(45);
+
+    // Extreme horizontal bounds: minX = -140, maxX = 100
+    const resultTooFarRight = clamper({ x: 200, y: 0 });
+    expect(resultTooFarRight.x).toBe(100);
+
+    const resultTooFarLeft = clamper({ x: -200, y: 0 });
+    expect(resultTooFarLeft.x).toBe(-140);
   });
 
-  it('allows downward placement only on side flanks outside the hand zone', () => {
-    const clamper = createSafeZoneClamper({
-      layout: '3P',
-      handPosition: 'bottom-center',
-      slotIndex: 0,
-      totalSlots: 1,
-      cardWidth: 110,
-    });
-
-    // Central hand zone width is narrowed to 360px (-180 to +180).
-    // If x is far left (-300), it is outside the hand zone:
-    const resultSide = clamper({ x: -300, y: 80 });
-    expect(resultSide.x).toBe(-300);
-    expect(resultSide.y).toBe(80); // Allowed because there are no hand cards on the far flank
-
-    // But if moved back horizontally towards center (0) while y = 80:
-    const resultReturned = clamper({ x: 0, y: 80 });
-    expect(resultReturned.y).toBe(20); // Immediately snapped to safe boundary!
-  });
-
-  it('protects the bottom-right hand zone in 4P', () => {
+  it('enforces strict boundary clamping for 4P bottom-right desk', () => {
     const clamper4P = createSafeZoneClamper({
       layout: '4P',
-      handPosition: 'bottom-right',
-      slotIndex: 0,
-      totalSlots: 2,
-      cardWidth: 100,
     });
 
-    // Dragging down into the right-hand corner is clamped
-    const resultRightDown = clamper4P({ x: 120, y: 80 });
-    expect(resultRightDown.y).toBe(20);
+    // Rightward movement is strictly clamped to maxX = 100
+    const resultSide = clamper4P({ x: 600, y: 0 });
+    expect(resultSide.x).toBe(100);
 
-    // Moving up into open quadrant table is permitted
-    const resultUp = clamper4P({ x: -50, y: -50 });
-    expect(resultUp.y).toBe(-50);
+    // Leftward movement is strictly clamped to minX = -140
+    const resultLeftSide = clamper4P({ x: -600, y: 0 });
+    expect(resultLeftSide.x).toBe(-140);
+
+    // Vertical movements
+    const resultUp = clamper4P({ x: 0, y: -250 });
+    expect(resultUp.y).toBe(-75);
+
+    const resultDown = clamper4P({ x: 0, y: 250 });
+    expect(resultDown.y).toBe(45);
+  });
+
+  it('clamps against constrained viewport dimensions with 12px margin when smaller than 50px boundary', () => {
+    const clamperUltraNarrow = createSafeZoneClamper({
+      layout: '3P',
+      viewportWidth: 150,
+      viewportHeight: 200,
+      margin: 12,
+    });
+
+    // (150 - 24) / 4 = 31 < 50 -> horizontal clamped within [-31, 31]
+    const resultRight = clamperUltraNarrow({ x: 100, y: 0 });
+    expect(resultRight.x).toBe(31);
+
+    const resultLeft = clamperUltraNarrow({ x: -100, y: 0 });
+    expect(resultLeft.x).toBe(-31);
+  });
+
+  describe('clampPositionToViewport', () => {
+    const baseRect = {
+      left: 1000,
+      top: 600,
+      width: 125,
+      height: 194,
+    };
+    const viewportOptions = {
+      viewportWidth: 1200,
+      viewportHeight: 800,
+      margin: 12,
+      topMargin: 50,
+    };
+
+    it('prevents cards from escaping outside window.innerWidth - 12px', () => {
+      // At x = 100, screen right would be 1000 + 100 + 125 = 1225 > 1200 - 12 (1188)
+      // Max allowed x = 1188 - 1000 - 125 = 63
+      const clamped = clampPositionToViewport(
+        { x: 100, y: 0 },
+        baseRect,
+        viewportOptions
+      );
+      expect(clamped.x).toBe(63);
+      expect(baseRect.left + clamped.x + baseRect.width).toBe(1200 - 12);
+    });
+
+    it('prevents cards from escaping outside window.innerHeight - 12px', () => {
+      // At y = 50, screen bottom would be 600 + 50 + 194 = 844 > 800 - 12 (788)
+      // Max allowed y = 788 - 600 - 194 = -6
+      const clamped = clampPositionToViewport(
+        { x: 0, y: 50 },
+        baseRect,
+        viewportOptions
+      );
+      expect(clamped.y).toBe(-6);
+      expect(baseRect.top + clamped.y + baseRect.height).toBe(800 - 12);
+    });
+
+    it('prevents cards from going above top: 50px', () => {
+      // At y = -600, screen top would be 600 - 600 = 0 < 50
+      // Min allowed y = 50 - 600 = -550
+      const clamped = clampPositionToViewport(
+        { x: 0, y: -600 },
+        baseRect,
+        viewportOptions
+      );
+      expect(clamped.y).toBe(-550);
+      expect(baseRect.top + clamped.y).toBe(50);
+    });
+
+    it('prevents cards from escaping outside left: 12px', () => {
+      // At x = -1100, screen left would be 1000 - 1100 = -100 < 12
+      // Min allowed x = 12 - 1000 = -988
+      const clamped = clampPositionToViewport(
+        { x: -1100, y: 0 },
+        baseRect,
+        viewportOptions
+      );
+      expect(clamped.x).toBe(-988);
+      expect(baseRect.left + clamped.x).toBe(12);
+    });
   });
 });

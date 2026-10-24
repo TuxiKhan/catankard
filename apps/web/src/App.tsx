@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import type { Action, PlayerView, Resource, ResourceCounts } from '@catankard/engine';
+import {
+  createGame,
+  getPlayerView,
+  applyAction,
+  type Action,
+  type GameConfig,
+  type GameState,
+  type PlayerView,
+  type Resource,
+  type ResourceCounts,
+} from '@catankard/engine';
 import { CardModal } from './components/CardModal.tsx';
 import { CharityModal } from './components/CharityModal.tsx';
 import { GameDesk3P } from './components/GameDesk3P.tsx';
@@ -19,6 +29,7 @@ export const App: React.FC = () => {
   const [room, setRoom] = useState<any | null>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [playerView, setPlayerView] = useState<PlayerView | null>(null);
+  const [demoState, setDemoState] = useState<GameState | null>(null);
 
   // Modallar
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
@@ -37,9 +48,42 @@ export const App: React.FC = () => {
     localStorage.setItem('catankard_player_name', name);
   };
 
-  // 2. Realtime Abonelikleri (Lobi & Oyun Durumu)
+  const startDemoGame = (count: 3 | 4 = 4) => {
+    const pids = count === 4 ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2', 'p3'];
+    const names: Record<string, string> = {
+      p1: playerName || 'Sen (Sina)',
+      p2: 'Ahmet',
+      p3: 'Zeynep',
+      p4: 'Can',
+    };
+    const config: GameConfig = {
+      players: pids.map((id) => ({ id, name: names[id] || 'Oyuncu' })),
+      metropolisSide: 'A',
+      turnTimerSeconds: 60,
+      seed: 'demo-seed-42',
+    };
+    const state = createGame(config, Date.now());
+    // Test oyuncusuna inşaat yapabilmesi için kaynak ver
+    state.hands['p1'] = { brick: 4, wood: 4, wheat: 3, wool: 3, ore: 3 };
+    setDemoState(state);
+    setRoom({ id: 'demo-room', status: 'playing', created_by: 'p1' });
+    setRoomId('demo-room');
+    setPlayerView(getPlayerView(state, 'p1'));
+  };
+
   useEffect(() => {
-    if (!roomId) return;
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo') || params.get('test');
+    if (demo === '4p' || demo === 'true') {
+      startDemoGame(4);
+    } else if (demo === '3p') {
+      startDemoGame(3);
+    }
+  }, []);
+
+  // 2. Realtime Abonelikleri (Lobi & Oyun Durumu - Demo odalarında Supabase dinlenmez)
+  useEffect(() => {
+    if (!roomId || roomId.startsWith('demo-')) return;
 
     // Oda tablosunu dinle
     const roomChannel = supabase
@@ -181,6 +225,18 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveRoom = async () => {
+    if (demoState) {
+      setDemoState(null);
+      setRoomId(null);
+      setRoom(null);
+      setPlayers([]);
+      setPlayerView(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('demo');
+      url.searchParams.delete('test');
+      window.history.replaceState({}, '', url.pathname);
+      return;
+    }
     if (!roomId) return;
     try {
       await invokeEdgeFunction('lobby', { op: 'leave_room', roomId });
@@ -191,8 +247,19 @@ export const App: React.FC = () => {
     setPlayerView(null);
   };
 
-  // Oyun Hamlesi İletme (Edge Function: game-action)
+  // Oyun Hamlesi İletme (Edge Function: game-action veya yerel demo modu)
   const dispatchAction = async (action: Action) => {
+    if (demoState) {
+      try {
+        const nextState = { ...demoState };
+        applyAction(nextState, 'p1', action, Date.now());
+        setDemoState(nextState);
+        setPlayerView(getPlayerView(nextState, 'p1'));
+      } catch (err: any) {
+        alert(err.message || 'Geçersiz hamle.');
+      }
+      return;
+    }
     if (!roomId) return;
     try {
       const data = await invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('game-action', {
@@ -215,7 +282,7 @@ export const App: React.FC = () => {
   const isGameActive = room?.status === 'playing' && playerView;
 
   return (
-    <div className="relative min-h-screen bg-slate-950">
+    <div className={`relative w-full h-full min-h-screen ${isGameActive ? 'overflow-hidden' : 'overflow-y-auto bg-slate-950'}`}>
       {/* Olay Bildirimi Banner'ı */}
       {eventNotification && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-2xl border-2 border-amber-300 animate-in slide-in-from-top duration-300 flex items-center gap-3 max-w-xl text-center">
@@ -240,9 +307,11 @@ export const App: React.FC = () => {
           onJoinRoom={handleJoinRoom}
           onStartGame={handleStartGame}
           onLeaveRoom={handleLeaveRoom}
+          onStartDemo={startDemoGame}
         />
       ) : playerView.turnOrder.length === 3 ? (
         <GameDesk3P
+          roomId={roomId}
           view={playerView}
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}
@@ -258,6 +327,7 @@ export const App: React.FC = () => {
         />
       ) : (
         <GameDesk4P
+          roomId={roomId}
           view={playerView}
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}

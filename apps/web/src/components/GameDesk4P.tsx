@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ArrowRightLeft,
-  CheckCircle2,
   Clock,
   LogOut,
 } from 'lucide-react';
@@ -11,7 +9,13 @@ import { CardStack } from './CardStack.tsx';
 import { TableCard } from './TableCard.tsx';
 import { FannedHand } from './FannedHand.tsx';
 import { GameMat } from './GameMat.tsx';
-import { useDraggablePlacement } from '../lib/useDraggablePlacement.ts';
+import { PlayerNameplate } from './PlayerNameplate.tsx';
+import { TimeWarningOverlay } from './TimeWarningOverlay.tsx';
+import { TableActionButtons } from './TableActionButtons.tsx';
+import { CardAnimationOverlay, GameOpeningCinematic } from './CardAnimations.tsx';
+import { assetUrl } from '../lib/assetUrl.ts';
+import { useCardAnimations, useLogAnimationListener } from '../lib/animationHooks.ts';
+import { useRealtimeCardPositions } from '../lib/useRealtimeCardPositions.ts';
 import { createSafeZoneClamper } from '../lib/safePlacementBoundary.ts';
 
 const formatRemainingTime = (seconds: number): string => {
@@ -24,6 +28,7 @@ const formatRemainingTime = (seconds: number): string => {
 };
 
 interface GameDesk4PProps {
+  roomId?: string | null;
   view: PlayerView;
   onInspectCard: (type: any, subKind?: any) => void;
   onOpenTrade: () => void;
@@ -38,6 +43,7 @@ interface GameDesk4PProps {
 }
 
 export const GameDesk4P: React.FC<GameDesk4PProps> = ({
+  roomId,
   view,
   onInspectCard,
   onOpenTrade,
@@ -54,14 +60,65 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     substitution?: { replace: Resource; pay: Resource };
   } | null>(null);
 
-  // Masadaki tüm kartların serbestçe sürüklenip bırakılması (Draggable Placement)
+  // Masadaki tüm kartların serbestçe sürüklenip bırakılması ve canlı senkronizasyonu
   const {
     positions: cardPositions,
+    positionsByPlayer,
     updatePosition: updateCardPosition,
-  } = useDraggablePlacement({ storageKey: 'catankard_4p_card_positions' });
+    broadcastCardPosition,
+  } = useRealtimeCardPositions({
+    roomId,
+    playerId: view.you,
+    legacyStorageKey: 'catankard_4p_card_positions',
+  });
 
   const [, setIsCardDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Kart Uçuş ve Masa Darbe Animasyonları
+  const {
+    flyingCards,
+    impacts,
+    spawnFlight,
+    spawnImpact,
+  } = useCardAnimations();
+
+  // Oyun Başlangıç Açılış Sinematiği (Kart karılması & dağıtımı)
+  const [showOpeningCinematic, setShowOpeningCinematic] = useState<boolean>(() => {
+    return view.turnNumber === 1 && !sessionStorage.getItem(`catankard_opened_${view.turnOrder.join('_')}`);
+  });
+
+  const handleFinishOpening = () => {
+    sessionStorage.setItem(`catankard_opened_${view.turnOrder.join('_')}`, '1');
+    setShowOpeningCinematic(false);
+  };
+
+  // Log Akışından Otomatik Animasyon Tetikleme (Hasat kart çekimi & İnşa etme darbeleri)
+  useLogAnimationListener({
+    recentLog: view.recentLog,
+    youPlayerId: view.you,
+    onDrawCard: (pid) => {
+      const isMe = pid === view.you;
+      spawnFlight({
+        startX: window.innerWidth * 0.38,
+        startY: window.innerHeight * 0.5,
+        endX: isMe ? window.innerWidth * 0.75 : window.innerWidth * 0.25,
+        endY: isMe ? window.innerHeight * 0.82 : window.innerHeight * 0.22,
+        scale: 0.95,
+        durationMs: 580,
+        cardBackUrl: assetUrl('/assets/cards/resource/resource_back.png'),
+      });
+    },
+    onPlayCard: (pid, cardType) => {
+      const isMe = pid === view.you;
+      spawnImpact({
+        x: isMe ? window.innerWidth * 0.65 : window.innerWidth * 0.35,
+        y: isMe ? window.innerHeight * 0.7 : window.innerHeight * 0.35,
+        color: '#38bdf8',
+        label: `${cardType.toUpperCase()} İNŞA EDİLDİ`,
+      });
+    },
+  });
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
   const opponents = view.turnOrder.filter((id) => id !== view.you);
@@ -115,6 +172,12 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     try {
       setLoading(true);
       await onBuild(card.id, source);
+      spawnImpact({
+        x: window.innerWidth * 0.65,
+        y: window.innerHeight * 0.75,
+        color: '#38bdf8',
+        label: 'İnşa Edildi!',
+      });
     } finally {
       setLoading(false);
     }
@@ -130,6 +193,12 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         stackId,
         pendingUpgrade.substitution
       );
+      spawnImpact({
+        x: window.innerWidth * 0.65,
+        y: window.innerHeight * 0.75,
+        color: '#eab308',
+        label: `${pendingUpgrade.type === 'city' ? 'ŞEHİR' : 'BÜYÜKŞEHİR'} YÜKSELTİLDİ!`,
+      });
       setPendingUpgrade(null);
       setSelectedStackId(null);
     } finally {
@@ -172,14 +241,12 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     (youHasArmy ? 1 : 0);
 
   return (
-    <div className="relative w-full min-h-screen bg-[#180103] flex flex-col justify-between overflow-hidden">
+    <div className="relative w-full h-screen min-h-screen flex flex-col justify-between overflow-hidden">
       {/* Son 10 Saniye Kırmızı Uyarı Çerçevesi & Vinyet Efekti */}
-      {isTimeWarning && (
-        <div
-          className="fixed inset-0 pointer-events-none z-40 border-4 sm:border-8 border-red-600/75 animate-pulse shadow-[inset_0_0_60px_rgba(220,38,38,0.5)] transition-opacity duration-300"
-          aria-hidden="true"
-        />
-      )}
+      <TimeWarningOverlay
+        isActive={isActive}
+        remainingSeconds={remainingSeconds}
+      />
 
       {/* 1. ÜST YÜZEN MINIMAL OYUN BARI */}
       <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-4 py-2 shadow-2xl flex items-center justify-between transition-all">
@@ -285,13 +352,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         <div className="w-full grid grid-cols-2 gap-4 pt-10">
           {/* Sol Üst Kadran: Opp1 */}
           {opp1 && (
-            <div
-              className={`flex flex-col items-start gap-1 relative rounded-2xl p-2 transition-all duration-300 ${
-                view.activePlayerId === opp1
-                  ? 'ring-2 ring-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.4)] bg-sky-950/20'
-                  : ''
-              }`}
-            >
+            <div className="flex flex-col items-start gap-1 relative p-1 transition-all duration-300">
               <div className="flex items-start gap-3">
                 {/* Rakip 1 Eli & İsim Etiketi */}
                 <div className="flex flex-col items-start">
@@ -301,18 +362,16 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     corner="top-left"
                     scale={0.78}
                   />
-                  <div
-                    className={`mt-1 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                      view.activePlayerId === opp1
-                        ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
-                        : 'bg-black/50 text-slate-200 border border-white/10'
-                    }`}
-                  >
-                    <span>{view.players[opp1]?.name}</span>
-                    <span className="text-yellow-400 font-black">
-                      {view.players[opp1]?.visibleVP} ZP
-                    </span>
-                  </div>
+                  <PlayerNameplate
+                    name={view.players[opp1]?.name || 'Oyuncu'}
+                    isTurn={view.activePlayerId === opp1}
+                    victoryPoints={view.players[opp1]?.visibleVP ?? 0}
+                    hasLongestRoute={opp1HasRoute}
+                    hasLargestArmy={opp1HasArmy}
+                    cardCount={view.players[opp1]?.handCount}
+                    align="left"
+                    className="mt-1"
+                  />
                 </div>
 
                 {/* Rakip 1 Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
@@ -323,38 +382,47 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       key={stack.id}
                       stack={stack}
                       onInspectCard={onInspectCard}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
+                      scale={1.0}
+                      baseWidth={125}
+                      baseHeight={194}
+                      position={positionsByPlayer[opp1]?.[stack.id]}
                     />
                   ))}
 
                   {/* Road Cards */}
-                  {Array.from({ length: opp1RoadsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp1}-road-${i}`}
-                      id={`${opp1}-road-${i}`}
-                      type="road"
-                      isStarting={i === 0}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('road')}
-                    />
-                  ))}
+                  {Array.from({ length: opp1RoadsCount }).map((_, i) => {
+                    const cardId = `${opp1}-road-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="road"
+                        isStarting={i === 0}
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp1]?.[cardId]}
+                        onInspect={() => onInspectCard('road')}
+                      />
+                    );
+                  })}
 
                   {/* Knight Cards */}
-                  {Array.from({ length: opp1KnightsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp1}-knight-${i}`}
-                      id={`${opp1}-knight-${i}`}
-                      type="knight"
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('knight')}
-                    />
-                  ))}
+                  {Array.from({ length: opp1KnightsCount }).map((_, i) => {
+                    const cardId = `${opp1}-knight-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="knight"
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp1]?.[cardId]}
+                        onInspect={() => onInspectCard('knight')}
+                      />
+                    );
+                  })}
 
                   {/* Bonus Cards */}
                   {opp1HasRoute && (
@@ -362,9 +430,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       key={`${opp1}-bonus-longest-route`}
                       id={`${opp1}-bonus-longest-route`}
                       type="longest_route"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp1]?.[`${opp1}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
                     />
                   )}
@@ -373,9 +442,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       key={`${opp1}-bonus-largest-army`}
                       id={`${opp1}-bonus-largest-army`}
                       type="largest_army"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp1]?.[`${opp1}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
                     />
                   )}
@@ -386,13 +456,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
           {/* Sağ Üst Kadran: Opp2 */}
           {opp2 && (
-            <div
-              className={`flex flex-col items-end gap-1 relative rounded-2xl p-2 transition-all duration-300 ${
-                view.activePlayerId === opp2
-                  ? 'ring-2 ring-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.4)] bg-sky-950/20'
-                  : ''
-              }`}
-            >
+            <div className="flex flex-col items-end gap-1 relative p-1 transition-all duration-300">
               <div className="flex items-start gap-3 flex-row-reverse">
                 {/* Rakip 2 Eli & İsim Etiketi */}
                 <div className="flex flex-col items-end">
@@ -402,66 +466,74 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     corner="top-right"
                     scale={0.78}
                   />
-                  <div
-                    className={`mt-1 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                      view.activePlayerId === opp2
-                        ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
-                        : 'bg-black/50 text-slate-200 border border-white/10'
-                    }`}
-                  >
-                    <span>{view.players[opp2]?.name}</span>
-                    <span className="text-yellow-400 font-black">
-                      {view.players[opp2]?.visibleVP} ZP
-                    </span>
-                  </div>
+                  <PlayerNameplate
+                    name={view.players[opp2]?.name || 'Oyuncu'}
+                    isTurn={view.activePlayerId === opp2}
+                    victoryPoints={view.players[opp2]?.visibleVP ?? 0}
+                    hasLongestRoute={opp2HasRoute}
+                    hasLargestArmy={opp2HasArmy}
+                    cardCount={view.players[opp2]?.handCount}
+                    align="right"
+                    className="mt-1"
+                  />
                 </div>
 
                 {/* Rakip 2 Masadaki Fiziksel Kartları */}
-                <div className="flex flex-wrap gap-2 items-end justify-end max-w-[320px] pt-1">
+                <div className="flex flex-wrap gap-2 items-end justify-end max-w-[340px] pt-1">
                   {opp2Area?.stacks.map((stack) => (
                     <CardStack
                       key={stack.id}
                       stack={stack}
                       onInspectCard={onInspectCard}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
+                      scale={1.0}
+                      baseWidth={125}
+                      baseHeight={194}
+                      position={positionsByPlayer[opp2]?.[stack.id]}
                     />
                   ))}
 
-                  {Array.from({ length: opp2RoadsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp2}-road-${i}`}
-                      id={`${opp2}-road-${i}`}
-                      type="road"
-                      isStarting={i === 0}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('road')}
-                    />
-                  ))}
+                  {Array.from({ length: opp2RoadsCount }).map((_, i) => {
+                    const cardId = `${opp2}-road-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="road"
+                        isStarting={i === 0}
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp2]?.[cardId]}
+                        onInspect={() => onInspectCard('road')}
+                      />
+                    );
+                  })}
 
-                  {Array.from({ length: opp2KnightsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp2}-knight-${i}`}
-                      id={`${opp2}-knight-${i}`}
-                      type="knight"
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('knight')}
-                    />
-                  ))}
+                  {Array.from({ length: opp2KnightsCount }).map((_, i) => {
+                    const cardId = `${opp2}-knight-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="knight"
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp2]?.[cardId]}
+                        onInspect={() => onInspectCard('knight')}
+                      />
+                    );
+                  })}
 
                   {opp2HasRoute && (
                     <TableCard
                       key={`${opp2}-bonus-longest-route`}
                       id={`${opp2}-bonus-longest-route`}
                       type="longest_route"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp2]?.[`${opp2}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
                     />
                   )}
@@ -470,9 +542,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       key={`${opp2}-bonus-largest-army`}
                       id={`${opp2}-bonus-largest-army`}
                       type="largest_army"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp2]?.[`${opp2}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
                     />
                   )}
@@ -482,8 +555,8 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           )}
         </div>
 
-        {/* Orta Alan: BUILDING ROW MAT */}
-        <div className="my-auto flex justify-center w-full z-10">
+        {/* Orta Alan: BUILDING ROW MAT (Masanın Tam Fiziksel Merkezinde) */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto">
           <BuildingRowMat
             view={view}
             onInspectCard={onInspectCard}
@@ -494,16 +567,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
 
         {/* Alt Kadranlar (Sol Alt: Opp3, Sağ Alt: SEN / Aktif Oyuncu) */}
-        <div className="w-full grid grid-cols-2 gap-4 pb-14">
+        <div className="w-full grid grid-cols-2 gap-4 pb-3 sm:pb-4">
           {/* Sol Alt Kadran: Opp3 */}
           {opp3 ? (
-            <div
-              className={`flex flex-col items-start gap-1 relative justify-end rounded-2xl p-2 transition-all duration-300 ${
-                view.activePlayerId === opp3
-                  ? 'ring-2 ring-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.4)] bg-sky-950/20'
-                  : ''
-              }`}
-            >
+            <div className="flex flex-col items-start gap-1 relative justify-end p-1 transition-all duration-300">
               <div className="flex items-end gap-3">
                 {/* Rakip 3 Eli & İsim Etiketi */}
                 <div className="flex flex-col items-start">
@@ -513,66 +580,74 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     corner="bottom-left"
                     scale={0.78}
                   />
-                  <div
-                    className={`mt-1 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                      view.activePlayerId === opp3
-                        ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
-                        : 'bg-black/50 text-slate-200 border border-white/10'
-                    }`}
-                  >
-                    <span>{view.players[opp3]?.name}</span>
-                    <span className="text-yellow-400 font-black">
-                      {view.players[opp3]?.visibleVP} ZP
-                    </span>
-                  </div>
+                  <PlayerNameplate
+                    name={view.players[opp3]?.name || 'Oyuncu'}
+                    isTurn={view.activePlayerId === opp3}
+                    victoryPoints={view.players[opp3]?.visibleVP ?? 0}
+                    hasLongestRoute={opp3HasRoute}
+                    hasLargestArmy={opp3HasArmy}
+                    cardCount={view.players[opp3]?.handCount}
+                    align="left"
+                    className="mt-1"
+                  />
                 </div>
 
                 {/* Rakip 3 Masadaki Fiziksel Kartları */}
-                <div className="flex flex-wrap gap-2 items-end max-w-[320px]">
+                <div className="flex flex-wrap gap-2 items-end max-w-[340px]">
                   {opp3Area?.stacks.map((stack) => (
                     <CardStack
                       key={stack.id}
                       stack={stack}
                       onInspectCard={onInspectCard}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
+                      scale={1.0}
+                      baseWidth={125}
+                      baseHeight={194}
+                      position={positionsByPlayer[opp3]?.[stack.id]}
                     />
                   ))}
 
-                  {Array.from({ length: opp3RoadsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp3}-road-${i}`}
-                      id={`${opp3}-road-${i}`}
-                      type="road"
-                      isStarting={i === 0}
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('road')}
-                    />
-                  ))}
+                  {Array.from({ length: opp3RoadsCount }).map((_, i) => {
+                    const cardId = `${opp3}-road-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="road"
+                        isStarting={i === 0}
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp3]?.[cardId]}
+                        onInspect={() => onInspectCard('road')}
+                      />
+                    );
+                  })}
 
-                  {Array.from({ length: opp3KnightsCount }).map((_, i) => (
-                    <TableCard
-                      key={`${opp3}-knight-${i}`}
-                      id={`${opp3}-knight-${i}`}
-                      type="knight"
-                      scale={0.75}
-                      baseWidth={120}
-                      baseHeight={178}
-                      onInspect={() => onInspectCard('knight')}
-                    />
-                  ))}
+                  {Array.from({ length: opp3KnightsCount }).map((_, i) => {
+                    const cardId = `${opp3}-knight-${i}`;
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="knight"
+                        scale={1.0}
+                        baseWidth={125}
+                        baseHeight={194}
+                        position={positionsByPlayer[opp3]?.[cardId]}
+                        onInspect={() => onInspectCard('knight')}
+                      />
+                    );
+                  })}
 
                   {opp3HasRoute && (
                     <TableCard
                       key={`${opp3}-bonus-longest-route`}
                       id={`${opp3}-bonus-longest-route`}
                       type="longest_route"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp3]?.[`${opp3}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
                     />
                   )}
@@ -581,9 +656,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       key={`${opp3}-bonus-largest-army`}
                       id={`${opp3}-bonus-largest-army`}
                       type="largest_army"
-                      scale={0.75}
-                      baseWidth={160}
-                      baseHeight={108}
+                      scale={1.0}
+                      baseWidth={186}
+                      baseHeight={120}
+                      position={positionsByPlayer[opp3]?.[`${opp3}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
                     />
                   )}
@@ -594,16 +670,11 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
             <div />
           )}
 
-          {/* Sağ Alt Kadran: SENİN MASAN (Table Cards & Bottom Right Hand) */}
-          <div
-            className={`flex flex-col items-end gap-1 relative justify-end rounded-2xl p-2 transition-all duration-300 pb-1 ${
-              isActive
-                ? 'ring-2 ring-sky-400/80 shadow-[0_0_35px_rgba(56,189,248,0.35)] bg-sky-950/15'
-                : ''
-            }`}
-          >
-            {/* 1. Masadaki Fiziksel Kartlar (Settlement stacks, Road cards, Knight cards, Bonus cards) */}
-            <div className="flex flex-wrap gap-2.5 items-end justify-end max-w-lg mb-3 z-20">
+          {/* Sağ Alt Kadran: SENİN MASAN (Sürükleme Alanı & Kaynak Kartları) */}
+          <div className="flex items-end justify-between gap-4 lg:gap-8 relative p-1 transition-all duration-300 pb-1 w-full pl-6 sm:pl-10 lg:pl-14">
+            {/* 1. Masadaki Fiziksel Kartlar (Görünmez alan, kaynak kartlarının solunda serbestçe sürüklenebilir) */}
+            <div className="relative z-20 shrink-0">
+              <div className="flex flex-wrap gap-2.5 items-end justify-start max-w-sm sm:max-w-md">
               {/* Yerleşim Yığınları */}
               {youArea?.stacks.map((stack, index) => {
                 const isSettlement = stack.top === 'settlement';
@@ -630,12 +701,13 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     isSelected={isSelected}
                     onSelect={handleConfirmUpgrade}
                     onInspectCard={onInspectCard}
-                    scale={0.96}
-                    baseWidth={120}
-                    baseHeight={178}
+                    scale={1.0}
+                    baseWidth={125}
+                    baseHeight={194}
                     isDraggable={true}
                     position={cardPositions[stack.id]}
                     onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
+                    onDragMove={(pos) => broadcastCardPosition(stack.id, pos)}
                     onDragChange={setIsCardDragging}
                     clampPosition={clampFn}
                   />
@@ -644,14 +716,14 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
               {/* Road Cards */}
               {Array.from({ length: youRoadsCount }).map((_, i) => {
-                const cardId = `you-4p-road-${i}`;
+                const cardId = `${view.you}-road-${i}`;
                 const slotIdx = (youArea?.stacks.length ?? 1) + i;
                 const clampFn = createSafeZoneClamper({
                   layout: '4P',
                   handPosition: 'bottom-right',
                   slotIndex: slotIdx,
                   totalSlots: totalYouCards,
-                  cardWidth: 120,
+                  cardWidth: 125,
                 });
 
                 return (
@@ -660,12 +732,13 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     id={cardId}
                     type="road"
                     isStarting={i === 0}
-                    scale={0.96}
-                    baseWidth={120}
-                    baseHeight={178}
+                    scale={1.0}
+                    baseWidth={125}
+                    baseHeight={194}
                     isDraggable={true}
-                    position={cardPositions[cardId]}
+                    position={cardPositions[cardId] || cardPositions[`you-4p-road-${i}`]}
                     onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                    onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
                     onDragChange={setIsCardDragging}
                     clampPosition={clampFn}
                     onInspect={() => onInspectCard('road')}
@@ -675,14 +748,14 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
               {/* Knight Cards */}
               {Array.from({ length: youKnightsCount }).map((_, i) => {
-                const cardId = `you-4p-knight-${i}`;
+                const cardId = `${view.you}-knight-${i}`;
                 const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
                 const clampFn = createSafeZoneClamper({
                   layout: '4P',
                   handPosition: 'bottom-right',
                   slotIndex: slotIdx,
                   totalSlots: totalYouCards,
-                  cardWidth: 120,
+                  cardWidth: 125,
                 });
 
                 return (
@@ -690,12 +763,13 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     key={cardId}
                     id={cardId}
                     type="knight"
-                    scale={0.96}
-                    baseWidth={120}
-                    baseHeight={178}
+                    scale={1.0}
+                    baseWidth={125}
+                    baseHeight={194}
                     isDraggable={true}
-                    position={cardPositions[cardId]}
+                    position={cardPositions[cardId] || cardPositions[`you-4p-knight-${i}`]}
                     onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                    onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
                     onDragChange={setIsCardDragging}
                     clampPosition={clampFn}
                     onInspect={() => onInspectCard('knight')}
@@ -707,14 +781,22 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
               {youHasRoute && (
                 <TableCard
                   key="bonus-4p-longest-route"
-                  id="bonus-4p-longest-route"
+                  id={`${view.you}-bonus-longest-route`}
                   type="longest_route"
-                  scale={0.96}
-                  baseWidth={160}
-                  baseHeight={108}
+                  scale={1.0}
+                  baseWidth={186}
+                  baseHeight={120}
                   isDraggable={true}
-                  position={cardPositions['bonus-4p-longest-route']}
-                  onPositionChange={(pos) => updateCardPosition('bonus-4p-longest-route', pos)}
+                  position={
+                    cardPositions[`${view.you}-bonus-longest-route`] ||
+                    cardPositions['bonus-4p-longest-route']
+                  }
+                  onPositionChange={(pos) =>
+                    updateCardPosition(`${view.you}-bonus-longest-route`, pos)
+                  }
+                  onDragMove={(pos) =>
+                    broadcastCardPosition(`${view.you}-bonus-longest-route`, pos)
+                  }
                   onDragChange={setIsCardDragging}
                   clampPosition={createSafeZoneClamper({
                     layout: '4P',
@@ -724,7 +806,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       youRoadsCount +
                       youKnightsCount,
                     totalSlots: totalYouCards,
-                    cardWidth: 160,
+                    cardWidth: 186,
                   })}
                   onInspect={() => onInspectCard('longest_route')}
                 />
@@ -732,14 +814,22 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
               {youHasArmy && (
                 <TableCard
                   key="bonus-4p-largest-army"
-                  id="bonus-4p-largest-army"
+                  id={`${view.you}-bonus-largest-army`}
                   type="largest_army"
-                  scale={0.96}
-                  baseWidth={160}
-                  baseHeight={108}
+                  scale={1.0}
+                  baseWidth={186}
+                  baseHeight={120}
                   isDraggable={true}
-                  position={cardPositions['bonus-4p-largest-army']}
-                  onPositionChange={(pos) => updateCardPosition('bonus-4p-largest-army', pos)}
+                  position={
+                    cardPositions[`${view.you}-bonus-largest-army`] ||
+                    cardPositions['bonus-4p-largest-army']
+                  }
+                  onPositionChange={(pos) =>
+                    updateCardPosition(`${view.you}-bonus-largest-army`, pos)
+                  }
+                  onDragMove={(pos) =>
+                    broadcastCardPosition(`${view.you}-bonus-largest-army`, pos)
+                  }
                   onDragChange={setIsCardDragging}
                   clampPosition={createSafeZoneClamper({
                     layout: '4P',
@@ -755,10 +845,11 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   onInspect={() => onInspectCard('largest_army')}
                 />
               )}
+              </div>
             </div>
 
-            {/* 2. Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi & Altında Sadece [İsim] [ZP] */}
-            <div className="w-full flex flex-col items-end z-10">
+            {/* 2. Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi & Altında İsim Plakası */}
+            <div className="flex flex-col items-end z-10 shrink-0">
               <FannedHand
                 hand={view.yourHand}
                 isCurrentPlayer={true}
@@ -766,60 +857,42 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 onInspectCard={onInspectCard}
                 scale={0.95}
               />
-              <div
-                className={`mt-1 flex items-center gap-1.5 px-3 py-0.5 rounded-lg text-xs font-bold transition-all ${
-                  isActive
-                    ? 'bg-sky-950/90 text-sky-200 border border-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.6)] animate-pulse'
-                    : 'bg-black/50 text-slate-200 border border-white/10'
-                }`}
-              >
-                <span>{youPlayer?.name || 'Sen'}</span>
-                <span className="text-yellow-400 font-black">
-                  {youPlayer?.visibleVP} ZP
-                </span>
-              </div>
+              <PlayerNameplate
+                name={youPlayer?.name || 'Sen'}
+                isTurn={isActive}
+                isMe={true}
+                victoryPoints={youPlayer?.visibleVP ?? 0}
+                hasLongestRoute={youHasRoute}
+                hasLargestArmy={youHasArmy}
+                cardCount={Object.values(view.yourHand ?? {}).reduce((a, b) => a + b, 0)}
+                align="right"
+                className="mt-1"
+              />
             </div>
           </div>
         </div>
       </GameMat>
 
-      {/* 3. ALT YÜZEN MINIMAL AKSİYON BARI */}
-      <footer className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center justify-between">
-        {/* Sol: Ticaret / Takas */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenTrade}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-lg border border-amber-400/40"
-          >
-            <ArrowRightLeft size={15} />
-            <span>Ticaret / Takas</span>
-            {view.tradeOffers.filter((o) => o.status === 'open').length > 0 && (
-              <span className="bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
-                {view.tradeOffers.filter((o) => o.status === 'open').length}
-              </span>
-            )}
-          </button>
-        </div>
+      {/* ALT AKSİYON BUTONLARI (4 Kişilik Oyunda Ortada: Ticaret & Turu Bitir) */}
+      <TableActionButtons
+        layout="4P"
+        onOpenTrade={onOpenTrade}
+        onEndTurn={onEndTurn}
+        isActive={isActive}
+        loading={loading}
+        openTradeOffersCount={view.tradeOffers.filter((o) => o.status === 'open').length}
+        activePlayerName={view.players[view.activePlayerId]?.name}
+      />
 
-        {/* Sağ: Turu Bitir */}
-        <div className="flex items-center gap-3">
-          {isActive ? (
-            <button
-              onClick={onEndTurn}
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black rounded-xl text-sm transition shadow-lg shadow-emerald-950/60 border border-emerald-400/50 animate-pulse"
-            >
-              <CheckCircle2 size={17} />
-              <span>Turu Bitir</span>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-sky-200/80 italic bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
-              <div className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
-              <span>{view.players[view.activePlayerId]?.name || 'Diğer oyuncu'} oynuyor...</span>
-            </div>
-          )}
-        </div>
-      </footer>
+      {/* Kart ve Masa Animasyonları Katmanı (Çekilen kartlar, uçuşlar, masa vuruşları) */}
+      <CardAnimationOverlay flyingCards={flyingCards} impacts={impacts} />
+
+      {/* Oyun Açılışı: Kart Karılması ve Dağıtımı Sinematiği */}
+      <GameOpeningCinematic
+        isOpen={showOpeningCinematic}
+        view={view}
+        onFinish={handleFinishOpening}
+      />
     </div>
   );
 };

@@ -29,6 +29,7 @@ interface LobbyProps {
   onJoinRoom: (code: string) => Promise<void>;
   onStartGame: () => Promise<void>;
   onLeaveRoom: () => Promise<void>;
+  onStartDemo?: (count: 3 | 4) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -41,6 +42,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onJoinRoom,
   onStartGame,
   onLeaveRoom,
+  onStartDemo,
 }) => {
   const [activeTab, setActiveTab] = useState<'join' | 'create'>('join');
   const [joinCode, setJoinCode] = useState('');
@@ -457,6 +459,33 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ANINDA TEST / DEMO BUTONLARI */}
+        {onStartDemo && !room && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+              Hızlı Canlı Test Masaları
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onStartDemo(4)}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-lg border border-emerald-400/40 flex items-center gap-2 transition"
+              >
+                <span>🎮</span>
+                <span>4 Kişilik Masayı Aç (4P Canlı)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onStartDemo(3)}
+                className="px-4 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow-lg border border-sky-400/40 flex items-center gap-2 transition"
+              >
+                <span>🎲</span>
+                <span>3 Kişilik Masayı Aç (3P Canlı)</span>
+              </button>
+            </div>
           </div>
         )}
       </main>

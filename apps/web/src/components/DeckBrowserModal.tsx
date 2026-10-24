@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { assetUrl } from '../lib/assetUrl.ts';
 
 export type DeckType = 'resource' | 'event' | 'metropolis' | 'building';
 
@@ -17,31 +18,31 @@ interface DeckCardItem {
 
 const DECK_CARDS: Record<DeckType, DeckCardItem[]> = {
   resource: [
-    { id: 'brick', imageUrl: '/assets/cards/resource/resource_brick.png', alt: 'Tuğla' },
-    { id: 'wood', imageUrl: '/assets/cards/resource/resource_wood.png', alt: 'Odun' },
-    { id: 'wool', imageUrl: '/assets/cards/resource/resource_wool.png', alt: 'Yün' },
-    { id: 'wheat', imageUrl: '/assets/cards/resource/resource_wheat.png', alt: 'Buğday' },
-    { id: 'ore', imageUrl: '/assets/cards/resource/resource_ore.png', alt: 'Demir' },
+    { id: 'brick', imageUrl: assetUrl('/assets/cards/resource/resource_brick.png'), alt: 'Tuğla' },
+    { id: 'wood', imageUrl: assetUrl('/assets/cards/resource/resource_wood.png'), alt: 'Odun' },
+    { id: 'wool', imageUrl: assetUrl('/assets/cards/resource/resource_wool.png'), alt: 'Yün' },
+    { id: 'wheat', imageUrl: assetUrl('/assets/cards/resource/resource_wheat.png'), alt: 'Buğday' },
+    { id: 'ore', imageUrl: assetUrl('/assets/cards/resource/resource_ore.png'), alt: 'Demir' },
   ],
   event: [
-    { id: 'robber', imageUrl: '/assets/cards/event/event_robber.png', alt: 'Hırsız' },
-    { id: 'solstice', imageUrl: '/assets/cards/event/event_solstice.png', alt: 'Yeni Yıl' },
-    { id: 'abundance', imageUrl: '/assets/cards/event/event_abundance.png', alt: 'Bolluk' },
-    { id: 'subsidy', imageUrl: '/assets/cards/event/event_subsidy.png', alt: 'Hasat Kutlaması' },
-    { id: 'charity', imageUrl: '/assets/cards/event/event_charity.png', alt: 'Sadaka' },
+    { id: 'robber', imageUrl: assetUrl('/assets/cards/event/event_robber.png'), alt: 'Hırsız' },
+    { id: 'solstice', imageUrl: assetUrl('/assets/cards/event/event_solstice.png'), alt: 'Yeni Yıl' },
+    { id: 'abundance', imageUrl: assetUrl('/assets/cards/event/event_abundance.png'), alt: 'Bolluk' },
+    { id: 'subsidy', imageUrl: assetUrl('/assets/cards/event/event_subsidy.png'), alt: 'Hasat Kutlaması' },
+    { id: 'charity', imageUrl: assetUrl('/assets/cards/event/event_charity.png'), alt: 'Sadaka' },
   ],
   metropolis: [
-    { id: 'metro_A', imageUrl: '/assets/cards/building/metropolis_A.png', alt: 'Metropolis A' },
-    { id: 'metro_B_knights', imageUrl: '/assets/cards/building/metropolis_B_knights.png', alt: 'Metropolis B - Şövalyeler' },
-    { id: 'metro_B_roads', imageUrl: '/assets/cards/building/metropolis_B_roads.png', alt: 'Metropolis B - Yollar' },
-    { id: 'metro_B_longest_route', imageUrl: '/assets/cards/building/metropolis_B_longest_route.png', alt: 'Metropolis B - En Uzun Yol' },
-    { id: 'metro_B_largest_army', imageUrl: '/assets/cards/building/metropolis_B_largest_army.png', alt: 'Metropolis B - En Güçlü Ordu' },
+    { id: 'metro_A', imageUrl: assetUrl('/assets/cards/building/metropolis_A.png'), alt: 'Metropolis A' },
+    { id: 'metro_B_knights', imageUrl: assetUrl('/assets/cards/building/metropolis_B_knights.png'), alt: 'Metropolis B - Şövalyeler' },
+    { id: 'metro_B_roads', imageUrl: assetUrl('/assets/cards/building/metropolis_B_roads.png'), alt: 'Metropolis B - Yollar' },
+    { id: 'metro_B_longest_route', imageUrl: assetUrl('/assets/cards/building/metropolis_B_longest_route.png'), alt: 'Metropolis B - En Uzun Yol' },
+    { id: 'metro_B_largest_army', imageUrl: assetUrl('/assets/cards/building/metropolis_B_largest_army.png'), alt: 'Metropolis B - En Güçlü Ordu' },
   ],
   building: [
-    { id: 'road', imageUrl: '/assets/cards/building/building_road.png', alt: 'Yol' },
-    { id: 'settlement', imageUrl: '/assets/cards/building/building_settlement.png', alt: 'Köy' },
-    { id: 'city', imageUrl: '/assets/cards/building/building_city.png', alt: 'Şehir' },
-    { id: 'knight', imageUrl: '/assets/cards/building/building_knight.png', alt: 'Şövalye' },
+    { id: 'road', imageUrl: assetUrl('/assets/cards/building/building_road.png'), alt: 'Yol' },
+    { id: 'settlement', imageUrl: assetUrl('/assets/cards/building/building_settlement.png'), alt: 'Köy' },
+    { id: 'city', imageUrl: assetUrl('/assets/cards/building/building_city.png'), alt: 'Şehir' },
+    { id: 'knight', imageUrl: assetUrl('/assets/cards/building/building_knight.png'), alt: 'Şövalye' },
   ],
 };
 

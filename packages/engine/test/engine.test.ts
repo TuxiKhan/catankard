@@ -262,6 +262,65 @@ describe('Game Engine - Building & Upgrades', () => {
     expect(state.hands[activePid]!.ore).toBe(0);
   });
 
+  it('replaces card in building row in-place at the exact slot when built', () => {
+    const now = 1000;
+    const state = createGame(BASE_CONFIG_3P, now);
+    const activePid = state.turnOrder[state.activePlayerIndex]!;
+
+    const c0 = { id: 'slot-0', type: 'road' as const };
+    const c1 = { id: 'slot-1', type: 'road' as const };
+    const c2 = { id: 'slot-2', type: 'road' as const };
+    const c3 = { id: 'slot-3', type: 'road' as const };
+    const c4 = { id: 'slot-4', type: 'road' as const };
+    state.buildingRow = [c0, c1, c2, c3, c4];
+
+    const nextDeckCard = { id: 'new-deck-card', type: 'knight' as const };
+    state.buildingDeck.push(nextDeckCard);
+
+    state.hands[activePid] = { brick: 1, wood: 1, wool: 0, wheat: 0, ore: 0 };
+
+    // Slot 2 deki karti insa et
+    applyAction(
+      state,
+      activePid,
+      { type: 'build', target: { source: 'row', cardId: 'slot-2' } },
+      now
+    );
+
+    // Slot 0, 1, 3, 4 yerini korumali; Slot 2 yeni deste karti ile doldurulmali
+    expect(state.buildingRow.length).toBe(5);
+    expect(state.buildingRow[0]!.id).toBe('slot-0');
+    expect(state.buildingRow[1]!.id).toBe('slot-1');
+    expect(state.buildingRow[2]!.id).toBe('new-deck-card');
+    expect(state.buildingRow[3]!.id).toBe('slot-3');
+    expect(state.buildingRow[4]!.id).toBe('slot-4');
+  });
+
+  it('splices card when building row card is built and deck is empty', () => {
+    const now = 1000;
+    const state = createGame(BASE_CONFIG_3P, now);
+    const activePid = state.turnOrder[state.activePlayerIndex]!;
+
+    state.buildingRow = [
+      { id: 's-0', type: 'road' },
+      { id: 's-1', type: 'road' },
+      { id: 's-2', type: 'knight' },
+    ];
+    state.buildingDeck = [];
+    state.hands[activePid] = { brick: 1, wood: 1, wool: 0, wheat: 0, ore: 0 };
+
+    applyAction(
+      state,
+      activePid,
+      { type: 'build', target: { source: 'row', cardId: 's-1' } },
+      now
+    );
+
+    expect(state.buildingRow.length).toBe(2);
+    expect(state.buildingRow[0]!.id).toBe('s-0');
+    expect(state.buildingRow[1]!.id).toBe('s-2');
+  });
+
   it('handles Metropolis B tiebreakers and triggers', () => {
     const now = 1000;
     const configB: GameConfig = { ...BASE_CONFIG_3P, metropolisSide: 'B' };
@@ -320,7 +379,7 @@ describe('Game Engine - Events & Decision Timing', () => {
     const dec = state.pendingDecisions[0]!;
     expect(dec.kind).toBe('robber_discard');
     expect(dec.playerId).toBe(otherPid);
-    expect(dec.count).toBe(4);
+    expect((dec as any).count).toBe(4);
 
     applyAction(
       state,

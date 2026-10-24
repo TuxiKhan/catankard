@@ -74,7 +74,7 @@ export interface GameMatProps {
 }
 
 export const GameMat: React.FC<GameMatProps> = ({
-  playerCount: _playerCount,
+  playerCount,
   children,
   view,
   onInspectCard,
@@ -121,105 +121,117 @@ export const GameMat: React.FC<GameMatProps> = ({
 
   const currentTheme = TABLE_THEMES[themeId] || TABLE_THEMES.bordo;
 
+  // Body arka plan rengini seçili çuha temasıyla senkronize et
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.style.backgroundColor = currentTheme.outerBg || currentTheme.bg;
+    }
+  }, [currentTheme]);
+
   return (
     <div
-      className={`relative w-full min-h-screen overflow-x-hidden flex items-center justify-center p-1 md:p-3 select-none transition-colors duration-500 ${className}`}
-      style={{ backgroundColor: currentTheme.outerBg }}
+      className={`relative w-full w-screen h-screen min-h-screen overflow-hidden flex flex-col justify-between select-none transition-colors duration-500 ${className}`}
+      style={{
+        backgroundColor: currentTheme.bg,
+        backgroundImage: currentTheme.radial,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
     >
-      {/* ============================================================== */}
-      {/* ÇUHA / KEÇE OYUN MASASI ZEMİNİ (SEÇİLEN TEMA RADYAL GEÇİŞİ)     */}
-      {/* ============================================================== */}
+      {/* Kadife Kumaş Doku Efekti (Subtle velvet / felt noise weave overlay) */}
       <div
-        className="relative w-full h-[96vh] min-h-[720px] max-w-[1600px] aspect-auto lg:aspect-[16/9] rounded-3xl border-4 shadow-[0_20px_70px_rgba(0,0,0,0.95),inset_0_0_150px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col justify-between transition-all duration-300"
+        className="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
         style={{
-          backgroundColor: currentTheme.bg,
-          backgroundImage: currentTheme.radial,
-          borderColor: currentTheme.border,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundImage: `radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px)`,
+          backgroundSize: '14px 14px',
         }}
-      >
-        {/* Kadife Kumaş Doku Efekti (Subtle velvet / felt noise weave overlay) */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
-          style={{
-            backgroundImage: `radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px)`,
-            backgroundSize: '14px 14px',
-          }}
-        />
+      />
 
-        {/* Masa Rengi Teması Seçici */}
-        <div className="absolute top-3.5 right-4 z-40" ref={menuRef}>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              title="Masa Çuhası Rengini Değiştir"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs rounded-full bg-black/60 hover:bg-black/85 text-amber-200 border border-amber-600/40 backdrop-blur-md transition shadow-lg group cursor-pointer"
-            >
-              <Palette size={13} className="text-amber-300 transition-transform group-hover:rotate-12" />
-              <span className="hidden sm:inline font-medium">{currentTheme.name}</span>
-              <span
-                className="w-2.5 h-2.5 rounded-full border border-white/50 shadow-inner"
-                style={{ backgroundColor: currentTheme.swatch }}
-              />
-            </button>
+      {/* Masa Kenar Vinyet Efekti (Edge-to-edge luxury felt table vignette) */}
+      <div
+        className="absolute inset-0 pointer-events-none shadow-[inset_0_0_160px_rgba(0,0,0,0.85),inset_0_0_60px_rgba(0,0,0,0.5)] z-0"
+      />
 
-            {/* Tema Açılır Menüsü */}
-            {isMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 p-1.5 rounded-xl bg-black/90 border border-amber-600/40 backdrop-blur-md shadow-2xl flex flex-col gap-1 min-w-[155px] z-50">
-                <div className="px-2 py-1 text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider border-b border-amber-600/20 mb-0.5">
-                  Masa Çuhası Rengi
-                </div>
-                {THEME_LIST.map((theme) => {
-                  const isSelected = theme.id === themeId;
-                  return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => {
-                        handleSelectTheme(theme.id);
-                        setIsMenuOpen(false);
-                      }}
-                      className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition text-left cursor-pointer ${
-                        isSelected
-                          ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
-                          : 'text-zinc-300 hover:bg-white/10 hover:text-white border border-transparent'
-                      }`}
-                    >
-                      <span
-                        className={`w-3.5 h-3.5 rounded-full border shadow-sm shrink-0 ${
-                          isSelected ? 'border-amber-300 scale-110' : 'border-white/40'
-                        }`}
-                        style={{ backgroundColor: theme.swatch }}
-                      />
-                      <span className="truncate">{theme.name}</span>
-                      {isSelected && <Check size={13} className="ml-auto text-amber-400 shrink-0" />}
-                    </button>
-                  );
-                })}
+      {/* ============================================================== */}
+      {/* "MASA" ORTA DAMGASI (Retro Catan playmat orta damgası)          */}
+      {/* ============================================================== */}
+      <div className="absolute top-3.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-0 select-none">
+        <div className="px-3.5 py-0.5 rounded-full border border-white/20 bg-black/30 backdrop-blur-xs text-white/50 text-[11px] font-mono tracking-[0.25em] uppercase font-bold shadow-sm">
+          masa
+        </div>
+      </div>
+
+      {/* Masa Rengi Teması Seçici */}
+      <div className="absolute top-3.5 right-4 z-40" ref={menuRef}>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            title="Masa Çuhası Rengini Değiştir"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs rounded-full bg-black/60 hover:bg-black/85 text-amber-200 border border-amber-600/40 backdrop-blur-md transition shadow-lg group cursor-pointer"
+          >
+            <Palette size={13} className="text-amber-300 transition-transform group-hover:rotate-12" />
+            <span className="hidden sm:inline font-medium">{currentTheme.name}</span>
+            <span
+              className="w-2.5 h-2.5 rounded-full border border-white/50 shadow-inner"
+              style={{ backgroundColor: currentTheme.swatch }}
+            />
+          </button>
+
+          {/* Tema Açılır Menüsü */}
+          {isMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 p-1.5 rounded-xl bg-black/90 border border-amber-600/40 backdrop-blur-md shadow-2xl flex flex-col gap-1 min-w-[155px] z-50">
+              <div className="px-2 py-1 text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider border-b border-amber-600/20 mb-0.5">
+                Masa Çuhası Rengi
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* ============================================================== */}
-        {/* İÇERİK KATMANI: Children varsa render et, yoksa BuildingRowMat  */}
-        {/* ============================================================== */}
-        <div className="relative z-10 w-full h-full flex flex-col justify-between p-2.5 sm:p-4 md:p-5">
-          {children ? (
-            children
-          ) : view ? (
-            <div className="my-auto flex items-center justify-center">
-              <BuildingRowMat
-                view={view}
-                onInspectCard={onInspectCard || (() => {})}
-                onSelectBuild={onSelectBuild || (() => {})}
-                canBuildMetropolis={Boolean(canBuildMetropolis)}
-              />
+              {THEME_LIST.map((theme) => {
+                const isSelected = theme.id === themeId;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => {
+                      handleSelectTheme(theme.id);
+                      setIsMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition text-left cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                        : 'text-zinc-300 hover:bg-white/10 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    <span
+                      className={`w-3.5 h-3.5 rounded-full border shadow-sm shrink-0 ${
+                        isSelected ? 'border-amber-300 scale-110' : 'border-white/40'
+                      }`}
+                      style={{ backgroundColor: theme.swatch }}
+                    />
+                    <span className="truncate">{theme.name}</span>
+                    {isSelected && <Check size={13} className="ml-auto text-amber-400 shrink-0" />}
+                  </button>
+                );
+              })}
             </div>
-          ) : null}
+          )}
         </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* İÇERİK KATMANI: Children varsa render et, yoksa BuildingRowMat  */}
+      {/* ============================================================== */}
+      <div className="relative z-10 w-full h-full flex flex-col justify-between p-2 sm:p-3 md:p-4">
+        {children ? (
+          children
+        ) : view ? (
+          <div className="my-auto flex items-center justify-center">
+            <BuildingRowMat
+              view={view}
+              onInspectCard={onInspectCard || (() => {})}
+              onSelectBuild={onSelectBuild || (() => {})}
+              canBuildMetropolis={Boolean(canBuildMetropolis)}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

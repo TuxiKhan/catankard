@@ -8,6 +8,8 @@ import {
   getBuildingImageUrl,
   getMetropolisImageUrl,
 } from '../lib/cardImages.ts';
+import { assetUrl } from '../lib/assetUrl.ts';
+import { clampPositionToViewport } from '../lib/safePlacementBoundary.ts';
 
 export interface CardPosition {
   x: number;
@@ -48,6 +50,8 @@ export interface CardStackProps {
   position?: CardPosition;
   /** Konum değiştiğinde çağrılır */
   onPositionChange?: (pos: CardPosition) => void;
+  /** Sürükleme esnasında canlı pozisyon akışı */
+  onDragMove?: (pos: CardPosition) => void;
   /** Sürükleme durumu değiştiğinde tetiklenir */
   onDragChange?: (isDragging: boolean) => void;
   /** Güvenli masa alanı sınırlandırma (Boundary Clamping) fonksiyonu */
@@ -65,12 +69,13 @@ export const CardStack: React.FC<CardStackProps> = ({
   scale,
   size = 'md',
   baseWidth = 125,
-  baseHeight = 186,
+  baseHeight = 194,
   layerOffset = 36,
   className = '',
   isDraggable = false,
   position,
   onPositionChange,
+  onDragMove,
   onDragChange,
   clampPosition,
 }) => {
@@ -100,22 +105,54 @@ export const CardStack: React.FC<CardStackProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<CardPosition>({ x: 0, y: 0 });
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const initialPosRef = useRef<CardPosition>({ x: 0, y: 0 });
   const justDraggedRef = useRef<boolean>(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const initialRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+
+  if (!isDragging) {
+    initialPosRef.current = { x: position?.x ?? 0, y: position?.y ?? 0 };
+  }
+
+  const getBaseRect = (element: HTMLElement | null) => {
+    if (initialRectRef.current) return initialRectRef.current;
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left - (initialPosRef.current.x || (position?.x ?? 0)),
+        top: rect.top - (initialPosRef.current.y || (position?.y ?? 0)),
+        width: rect.width || cardW,
+        height: rect.height || totalHeight,
+      };
+    }
+    return null;
+  };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggable) return;
     if (e.button !== 0) return; // Sadece sol tık
 
     dragStartRef.current = { x: e.clientX, y: e.clientY };
+    initialPosRef.current = { x: position?.x ?? 0, y: position?.y ?? 0 };
     justDraggedRef.current = false;
     setIsDragging(true);
     onDragChange?.(true);
     setDragOffset({ x: 0, y: 0 });
 
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
+    const targetEl = cardRef.current ?? (e.currentTarget as HTMLDivElement);
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
+      initialRectRef.current = {
+        left: rect.left - (position?.x ?? 0),
+        top: rect.top - (position?.y ?? 0),
+        width: rect.width || cardW,
+        height: rect.height || totalHeight,
+      };
+      try {
+        targetEl.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -129,23 +166,30 @@ export const CardStack: React.FC<CardStackProps> = ({
       justDraggedRef.current = true;
     }
 
-    const rawX = (position?.x ?? 0) + dx;
-    const rawY = (position?.y ?? 0) + dy;
-    const clamped = clampPosition
+    const rawX = initialPosRef.current.x + dx;
+    const rawY = initialPosRef.current.y + dy;
+    let clamped = clampPosition
       ? clampPosition({ x: rawX, y: rawY })
       : { x: rawX, y: rawY };
 
+    const baseRect = getBaseRect(cardRef.current ?? e.currentTarget);
+    if (baseRect) {
+      clamped = clampPositionToViewport(clamped, baseRect);
+    }
+
     setDragOffset({
-      x: clamped.x - (position?.x ?? 0),
-      y: clamped.y - (position?.y ?? 0),
+      x: clamped.x - initialPosRef.current.x,
+      y: clamped.y - initialPosRef.current.y,
     });
+
+    onDragMove?.(clamped);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
 
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      (cardRef.current ?? e.currentTarget).releasePointerCapture(e.pointerId);
     } catch {
       // ignore
     }
@@ -154,19 +198,25 @@ export const CardStack: React.FC<CardStackProps> = ({
     onDragChange?.(false);
 
     if (justDraggedRef.current) {
-      const rawX = (position?.x ?? 0) + dragOffset.x;
-      const rawY = (position?.y ?? 0) + dragOffset.y;
-      const finalPos = clampPosition
+      const rawX = initialPosRef.current.x + dragOffset.x;
+      const rawY = initialPosRef.current.y + dragOffset.y;
+      let finalPos = clampPosition
         ? clampPosition({ x: rawX, y: rawY })
         : {
             x: Math.round(rawX),
             y: Math.round(rawY),
           };
 
+      const baseRect = getBaseRect(cardRef.current ?? e.currentTarget);
+      if (baseRect) {
+        finalPos = clampPositionToViewport(finalPos, baseRect);
+      }
+
       onPositionChange?.(finalPos);
     }
 
     dragStartRef.current = null;
+    initialRectRef.current = null;
     setDragOffset({ x: 0, y: 0 });
 
     setTimeout(() => {
@@ -177,11 +227,12 @@ export const CardStack: React.FC<CardStackProps> = ({
   const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      (cardRef.current ?? e.currentTarget).releasePointerCapture(e.pointerId);
     } catch {}
     setIsDragging(false);
     onDragChange?.(false);
     dragStartRef.current = null;
+    initialRectRef.current = null;
     setDragOffset({ x: 0, y: 0 });
   };
 
@@ -220,8 +271,8 @@ export const CardStack: React.FC<CardStackProps> = ({
     }
   };
 
-  const currentX = (position?.x ?? 0) + (isDragging ? dragOffset.x : 0);
-  const currentY = (position?.y ?? 0) + (isDragging ? dragOffset.y : 0);
+  const currentX = isDraggable ? (initialPosRef.current.x + dragOffset.x) : Math.max(-140, Math.min(100, position?.x ?? 0));
+  const currentY = isDraggable ? (initialPosRef.current.y + dragOffset.y) : Math.max(-80, Math.min(50, position?.y ?? 0));
   const hasCustomPos = currentX !== 0 || currentY !== 0;
 
   const transformStyle = hasCustomPos
@@ -230,6 +281,7 @@ export const CardStack: React.FC<CardStackProps> = ({
 
   return (
     <div
+      ref={cardRef}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onDoubleClick={handleDoubleClick}
@@ -241,6 +293,7 @@ export const CardStack: React.FC<CardStackProps> = ({
         width: `${cardW}px`,
         height: `${totalHeight}px`,
         transform: transformStyle,
+        transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
         zIndex: isDragging ? 50 : isSelected ? 20 : isSelectable ? 10 : hasCustomPos ? 5 : 1,
         touchAction: isDraggable ? 'none' : 'auto',
       }}
@@ -248,8 +301,8 @@ export const CardStack: React.FC<CardStackProps> = ({
         isDragging
           ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
           : isDraggable
-          ? 'cursor-grab hover:scale-[1.02] transition-transform duration-100'
-          : 'cursor-pointer hover:scale-[1.02] transition-all duration-150'
+          ? 'cursor-grab hover:scale-[1.02]'
+          : 'cursor-pointer hover:scale-[1.02]'
       } ${
         isSelected
           ? 'ring-4 ring-sky-400 shadow-sky-500/40 shadow-2xl rounded-xl'
@@ -334,7 +387,7 @@ export const CardStack: React.FC<CardStackProps> = ({
             src={
               metropolis
                 ? getMetropolisImageUrl(metropolis)
-                : '/assets/cards/building/metropolis_A.png'
+                : assetUrl('/assets/cards/building/metropolis_A.png')
             }
             alt="Büyükşehir"
             className="w-full h-full object-cover pointer-events-none"

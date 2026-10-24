@@ -5,9 +5,12 @@ import {
   getBuildingImageUrl,
   getMetropolisImageUrl,
 } from '../lib/cardImages.ts';
+import { assetUrl } from '../lib/assetUrl.ts';
 import { canAffordCard } from '../lib/canAfford.ts';
 import { DeckBrowserModal, type DeckType } from './DeckBrowserModal.tsx';
 import { TableCard } from './TableCard.tsx';
+import { ReplenishCardSlot } from './CardAnimations.tsx';
+import { useReplenishDetector } from '../lib/animationHooks.ts';
 
 export interface BuildingRowMatProps {
   view: PlayerView;
@@ -24,6 +27,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   scale = 1,
 }) => {
   const [browsingDeck, setBrowsingDeck] = useState<DeckType | null>(null);
+  const { isReplenishing } = useReplenishDetector(view.buildingRow);
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
   const roads = view.players[view.you]?.area?.roads ?? 0;
@@ -38,13 +42,13 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
     hasOpenCity && canAffordCard('metropolis', view.yourHand, roads, subUsed);
   const canBuildMetro = isActive && topMetro !== null && canAffordMetro;
 
-  // Taban kart boyutları: 96x140 px (~1.3x ölçek)
-  const cardW = Math.round(96 * scale);
-  const cardH = Math.round(140 * scale);
+  // Taban kart boyutları: 125x194 px (Orijinal 840x1302 kart en-boy oranı, yerdeki kartlarla birebir aynı)
+  const cardW = Math.round(125 * scale);
+  const cardH = Math.round(194 * scale);
 
-  // Taban bonus kart boyutları (yatay): 140x90 px (üst üste katmanlı 20px kayma)
-  const bonusBaseW = 140;
-  const bonusBaseH = 90;
+  // Taban bonus kart boyutları (yatay): 186x120 px (Orijinal 1479x954 bonus kart oranı, üst üste katmanlı 20px kayma)
+  const bonusBaseW = 186;
+  const bonusBaseH = 120;
   const bonusShiftY = 20;
 
   const hasRouteBonus = !view.longestRouteOwner;
@@ -71,7 +75,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           {/* Çoklu deste katman efekti */}
           <div className="absolute inset-0 bg-amber-900/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
           <img
-            src="/assets/cards/resource/resource_back.png"
+            src={assetUrl('/assets/cards/resource/resource_back.png')}
             alt="Kaynak Destesi"
             className="w-full h-full object-cover"
             draggable={false}
@@ -99,7 +103,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             {/* Katman efekti */}
             <div className="absolute inset-0 bg-emerald-950/60 rounded-xl translate-x-0.5 translate-y-0.5 -z-10" />
             <img
-              src="/assets/cards/building/building_back.png"
+              src={assetUrl('/assets/cards/building/building_back.png')}
               alt="İnşaat Kartı Destesi"
               className="w-full h-full object-cover"
               draggable={false}
@@ -114,53 +118,41 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           {Array.from({ length: 5 }).map((_, index) => {
             const card = view.buildingRow[index];
 
-            if (!card) {
-              return (
-                <div
-                  key={`empty-${index}`}
-                  className="rounded-xl border-2 border-dashed border-stone-600/50 bg-stone-900/20 flex flex-col items-center justify-center text-stone-500"
-                  style={{ width: `${cardW}px`, height: `${cardH}px` }}
-                >
-                  <span className="text-xs font-bold">#{index + 1}</span>
-                </div>
-              );
-            }
-
-            let canAfford = isActive && canAffordCard(card.type, view.yourHand, roads, subUsed);
-            if (card.type === 'city' && !hasOpenSettlement) {
-              canAfford = false;
+            let canAfford = false;
+            if (card) {
+              canAfford = isActive && canAffordCard(card.type, view.yourHand, roads, subUsed);
+              if (card.type === 'city' && !hasOpenSettlement) {
+                canAfford = false;
+              }
             }
 
             return (
-              <div
-                key={card.id || index}
-                className={`relative rounded-xl overflow-hidden border transition-all duration-200 select-none ${
-                  canAfford
-                    ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] hover:scale-105 cursor-pointer'
-                    : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50 hover:scale-[1.02] cursor-default'
-                }`}
-                style={{ width: `${cardW}px`, height: `${cardH}px` }}
+              <ReplenishCardSlot
+                key={'building-slot-' + index}
+                card={card}
+                index={index}
+                width={cardW}
+                height={cardH}
+                canAfford={canAfford}
+                isReplenishing={isReplenishing(index)}
                 onClick={() => {
-                  if (canAfford) {
+                  if (card && canAfford) {
                     onSelectBuild(card, 'row');
                   }
                 }}
                 onContextMenu={(e) => {
-                  e.preventDefault();
-                  onInspectCard(card.type);
+                  if (card) {
+                    e.preventDefault();
+                    onInspectCard(card.type);
+                  }
                 }}
                 onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onInspectCard(card.type);
+                  if (card) {
+                    e.stopPropagation();
+                    onInspectCard(card.type);
+                  }
                 }}
-              >
-                <img
-                  src={getBuildingImageUrl(card.type)}
-                  alt={card.type}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
-              </div>
+              />
             );
           })}
         </div>
@@ -226,7 +218,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           >
             <div className="absolute inset-0 bg-slate-800/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
             <img
-              src="/assets/cards/event/event_back.png"
+              src={assetUrl('/assets/cards/event/event_back.png')}
               alt="Olay Destesi"
               className="w-full h-full object-cover"
               draggable={false}

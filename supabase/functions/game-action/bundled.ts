@@ -589,7 +589,11 @@ function handleAction(state, actor, action, now) {
       }
       if (target.source === "row") {
         const cardIndex = state.buildingRow.findIndex((c) => c.id === target.cardId);
-        state.buildingRow.splice(cardIndex, 1);
+        if (state.buildingDeck.length > 0) {
+          state.buildingRow[cardIndex] = state.buildingDeck.pop();
+        } else {
+          state.buildingRow.splice(cardIndex, 1);
+        }
       } else {
         const metroIndex = state.metropolisStack.findIndex((m) => m.id === target.cardId);
         state.metropolisStack.splice(metroIndex, 1);
@@ -611,9 +615,6 @@ function handleAction(state, actor, action, now) {
         drawAndResolveEvent(state, now);
       }
       if (target.source === "row") {
-        while (state.buildingRow.length < 5 && state.buildingDeck.length > 0) {
-          state.buildingRow.push(state.buildingDeck.pop());
-        }
         checkAndReshuffleBuildingRow(state);
       }
       updateBonusCards(state);

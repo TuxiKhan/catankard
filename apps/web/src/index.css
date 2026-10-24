@@ -2,9 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #0b0f19;
+  background-color: #150103;
   color: #f1f5f9;
+}
+
+/* Mavi Neon Yanıp Sönen İsim & Parıltı Efektleri */
+@keyframes blue-pulse-glow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.9), 0 0 20px rgba(14, 165, 233, 0.7);
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
+    opacity: 0.95;
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(56, 189, 248, 1), 0 0 35px rgba(56, 189, 248, 0.95), 0 0 50px rgba(14, 165, 233, 0.85);
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 1));
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes blue-aura-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.2);
+    border-color: rgba(56, 189, 248, 0.75);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(56, 189, 248, 0.9), inset 0 0 16px rgba(56, 189, 248, 0.45);
+    border-color: rgba(125, 211, 252, 1);
+  }
+}
+
+.animate-blue-pulse-glow {
+  animation: blue-pulse-glow 1.8s ease-in-out infinite;
+}
+
+.animate-blue-aura {
+  animation: blue-aura-pulse 1.8s ease-in-out infinite;
+}
+
+/* Son 10 Saniye ve Kritik Zaman Uyarı Animasyonları */
+@keyframes time-warning-pulse-slow {
+  0%, 100% {
+    opacity: 0.85;
+    box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.65), inset 0 0 45px rgba(220, 38, 38, 0.8);
+    border-color: rgba(239, 68, 68, 0.8);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: inset 0 0 150px rgba(239, 68, 68, 0.9), inset 0 0 75px rgba(220, 38, 38, 0.95), inset 0 0 30px rgba(255, 100, 100, 0.4);
+    border-color: rgba(248, 113, 113, 1);
+  }
+}
+
+@keyframes time-warning-pulse-fast {
+  0%, 100% {
+    opacity: 0.75;
+    box-shadow: inset 0 0 110px rgba(239, 68, 68, 0.8), inset 0 0 60px rgba(220, 38, 38, 0.9);
+    border-color: rgba(239, 68, 68, 0.9);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: inset 0 0 200px rgba(239, 68, 68, 1), inset 0 0 100px rgba(220, 38, 38, 1), inset 0 0 40px rgba(255, 255, 255, 0.6);
+    border-color: rgba(254, 202, 202, 1);
+  }
+}
+
+@keyframes time-warning-flash {
+  0%, 100% {
+    opacity: 0.08;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+@keyframes time-warning-badge-beat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes time-warning-corner-flare {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.12);
+  }
+}
+
+.animate-time-pulse-slow {
+  animation: time-warning-pulse-slow 1.25s ease-in-out infinite;
+}
+
+.animate-time-pulse-fast {
+  animation: time-warning-pulse-fast 0.6s ease-in-out infinite;
+}
+
+.animate-time-flash-fast {
+  animation: time-warning-flash 0.5s ease-in-out infinite;
+}
+
+.animate-time-badge-beat {
+  animation: time-warning-badge-beat 1s ease-in-out infinite;
+}
+
+.animate-time-badge-critical {
+  animation: time-warning-badge-beat 1s ease-in-out infinite;
+}
+
+.animate-time-corner-flare {
+  animation: time-warning-corner-flare 1.2s ease-in-out infinite;
+}
+
+.animate-time-corner-flare-fast {
+  animation: time-warning-corner-flare 0.6s ease-in-out infinite;
 }
