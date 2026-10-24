@@ -43,15 +43,74 @@ serve(async (req) => {
     }
 
     const { roomId } = body;
+    let hostTransferred = false;
+
     if (roomId) {
+      const now = Date.now();
       await supabase
         .from('room_players')
-        .update({ last_seen_at: new Date().toISOString() })
+        .update({ last_seen_at: new Date(now).toISOString() })
         .eq('room_id', roomId)
         .eq('user_id', userId);
+
+      // Kurucu kontrolü ve gerekirse devir:
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('id, created_by, status')
+        .eq('id', roomId)
+        .maybeSingle();
+
+      if (room && room.status !== 'finished' && room.status !== 'abandoned') {
+        const { data: hostPlayer } = await supabase
+          .from('room_players')
+          .select('user_id, last_seen_at')
+          .eq('room_id', roomId)
+          .eq('user_id', room.created_by)
+          .maybeSingle();
+
+        const hostLastSeen = hostPlayer ? new Date(hostPlayer.last_seen_at).getTime() : 0;
+        const isHostOffline = !hostPlayer || (now - hostLastSeen > 60_000);
+
+        if (isHostOffline) {
+          // Kurucu 60 saniyeden uzun süredir offline!
+          // Kalan diğer oyuncuları seat_index sırasına göre al
+          const { data: otherPlayers } = await supabase
+            .from('room_players')
+            .select('*')
+            .eq('room_id', roomId)
+            .neq('user_id', room.created_by)
+            .order('seat_index', { ascending: true });
+
+          // Son 60 saniyede aktif olan ilk oyuncu, yoksa sıradaki ilk oyuncu
+          const newHost = (otherPlayers ?? []).find(
+            (p: any) => (now - new Date(p.last_seen_at).getTime()) <= 60_000
+          ) ?? otherPlayers?.[0];
+
+          if (newHost) {
+            await supabase
+              .from('rooms')
+              .update({ created_by: newHost.user_id })
+              .eq('id', roomId);
+
+            await supabase
+              .from('room_players')
+              .update({ is_host: false })
+              .eq('room_id', roomId)
+              .eq('user_id', room.created_by);
+
+            await supabase
+              .from('room_players')
+              .update({ is_host: true })
+              .eq('room_id', roomId)
+              .eq('user_id', newHost.user_id);
+
+            hostTransferred = true;
+          }
+        }
+      }
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, hostTransferred }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

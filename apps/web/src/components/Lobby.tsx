@@ -377,9 +377,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                 {/* Büyükşehir Modu */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Büyükşehir Tipi
+                    Büyükşehir Modu
                   </label>
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => setMetropolisSide('A')}
@@ -390,7 +390,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                       }`}
                     >
                       <div className="text-xs font-bold flex items-center gap-1.5">
-                        <Layers size={14} /> A Tarafı (Klasik)
+                        <Layers size={14} className="shrink-0" />
+                        <span>Oyuna yeni başladım (A Yüzü - Basit Mod)</span>
                       </div>
                       <div className="text-[10px] text-slate-500 mt-1">
                         Tüm şehirlere standart bonus
@@ -407,7 +408,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                       }`}
                     >
                       <div className="text-xs font-bold flex items-center gap-1.5">
-                        <Sparkles size={14} /> B Tarafı (Özel)
+                        <Sparkles size={14} className="shrink-0" />
+                        <span>Deneyimliyim (B Yüzü - Özel Yetenekli Mod)</span>
                       </div>
                       <div className="text-[10px] text-slate-500 mt-1">
                         Yol & ordu eşitlik avantajları

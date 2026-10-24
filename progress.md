@@ -3,11 +3,20 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 8 – Kullanıcı Geri Bildirimiyle 12 Maddelik UI/UX & Kural İyileştirmeleri Eksiksiz Tamamlandı
+- **Aşama:** STEP 9 – 7 Paralel Ajan ile Kapsamlı UI/UX, Motor, Kart & Backend Kurucu Devri İyileştirmeleri Eksiksiz Tamamlandı
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
-- **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1 (Edge Functions v3 deployed)
+- **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1 (Edge Functions v4 deployed)
 - **Canlı Test:** `http://localhost:5173/` (Vite dev server aktif)
 - **Son güncelleme:** 2026-10-24
+
+## 7 Paralel Ajan ile Tamamlanan İyileştirmeler
+1. **Tüm Kartların Orijinal Kart Görseline Dönüştürülmesi:** Masada duran tüm yol kartları (başlangıç yolu dahil) ve köy kartları üzerindeki yapay metinler temizlendi; doğrudan tam maliyet bantlı ve takas oranlı orijinal kart görselleri (`building_road.png`, `building_settlement.png`) kullanıldı.
+2. **Ponytail Kod Temizliği & Fazlalıkların Ayıklanması:** Kullanılmayan ölü bileşenler (`PlayerDesk.tsx`, `BuildingRow.tsx`, `BuildModal.tsx`, `DraggableStack.tsx`, `SafePlacementZone.tsx`) ve gereksiz wrapper'lar silindi; kod tabanı minimal ve yalın hale getirildi.
+3. **Yatay Bonus Kartları & Masada Üst Üste İstif:** En Uzun Yol ve En Güçlü Ordu kartları orijinal landscape formatına (160x108 px) uyarlandı; masada kazanılmayı beklerken sağ tarafta derli toplu katmanlı (stacked) durması ve hover ile incelenebilmesi sağlandı.
+4. **Metropolis A/B Deste Detayı & Lobi Açıklamaları:** Kapalı büyükşehir destesi modalında (`DeckBrowserModal`) A modunda sadece A kartı, B modunda sadece 4 B kartı filtrelendi; Lobi oda kurma ekranında "Oyuna yeni başladım (A Yüzü - Basit Mod)" ve "Deneyimliyim (B Yüzü - Özel Yetenekli Mod)" dostane etiketleri eklendi.
+5. **Masa Renk Temaları & Fotoğraf Butonunun Kaldırılması:** Sağ üstteki "Masa Fotoğrafı" butonu kaldırıldı; yerine 4 farklı çuha teması (Bordo Klasik, Zümrüt Yeşili, Gece Mavisi, Kömür Antrasit) eklenip `localStorage` ile kalıcı hale getirildi.
+6. **Canlı Süre Sayacı & Son 10 Sn Kırmızı Uyarı:** `turnDeadline` bazlı saniyelik çalışan canlı sayaç state'i kuruldu; aktif oyuncunun süresi <= 10 saniye kaldığında ekranın etrafında dikkat çekici kırmızı nabız atan vinyet uyarı çerçevesi gösterildi.
+7. **Kurucu Düşünce Odanın Kapanmaması & Kuruculuğun Devri:** Kurucu ayrıldığında veya 60 sn offline kaldığında odanın kapanmaması, kuruculuğun sıradaki aktif oyuncuya devredilmesi ve düşen oyuncunun/kurucunun koltuğunu koruyarak geri dönebilmesi (`join_room` reconnect) backend Edge Function'larında uygulandı ve Supabase'e deploy edildi.
 
 ## Tamamlanan 12 Maddelik UI/UX & Motor İyileştirmeleri
 1. **Büyük & Serbest Sürüklenebilir Masa Kartları:** Masadaki kartlar büyütüldü (~125x186px), her oyuncu kendi alanında kartları serbestçe sürükleyip bırakabilir (`kart yerde kalcak`).

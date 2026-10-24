@@ -42,6 +42,17 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   const cardW = Math.round(96 * scale);
   const cardH = Math.round(140 * scale);
 
+  // Taban bonus kart boyutları (yatay): 140x90 px (üst üste katmanlı 20px kayma)
+  const bonusBaseW = 140;
+  const bonusBaseH = 90;
+  const bonusShiftY = 20;
+
+  const hasRouteBonus = !view.longestRouteOwner;
+  const hasArmyBonus = !view.largestArmyOwner;
+  const hasBothBonuses = hasRouteBonus && hasArmyBonus;
+  const bonusContainerH = Math.round((hasBothBonuses ? bonusBaseH + bonusShiftY : bonusBaseH) * scale);
+  const bonusContainerW = Math.round(bonusBaseW * scale);
+
   return (
     <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-6 select-none relative my-2">
       {/* 1. SOL KENAR: Kapalı Kaynak Kartı Destesi */}
@@ -228,32 +239,61 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
         </div>
       </div>
 
-      {/* 4. SAĞ KENAR: KAZANILMAYI BEKLEYEN MASADAKİ BONUS KARTLAR (3 Yol & Büyük Ordu) */}
-      {(!view.longestRouteOwner || !view.largestArmyOwner) && (
-        <div className="flex items-center gap-2.5 sm:gap-3 ml-1 sm:ml-2">
-          {/* Henüz hiç kimse kazanmadıysa Masada market hizasında duran "En Uzun Yol" Kartı */}
-          {!view.longestRouteOwner && (
-            <TableCard
-              id="table-bonus-longest-route"
-              type="longest_route"
-              scale={scale}
-              baseWidth={96}
-              baseHeight={140}
-              onInspect={() => onInspectCard('longest_route')}
-            />
-          )}
+      {/* 4. SAĞ KENAR: KAZANILMAYI BEKLEYEN MASADAKİ BONUS KARTLAR (En Uzun Yol & Büyük Ordu - Üst Üste İstifli) */}
+      {(hasRouteBonus || hasArmyBonus) && (
+        <div className="relative flex flex-col items-center justify-center ml-1 sm:ml-2 select-none">
+          <div
+            className="relative"
+            style={{
+              width: `${bonusContainerW}px`,
+              height: `${bonusContainerH}px`,
+            }}
+          >
+            {/* Henüz hiç kimse kazanmadıysa Masadaki "En Uzun Yol" Kartı */}
+            {hasRouteBonus && (
+              <div
+                className={`absolute left-0 top-0 transition-all duration-200 ${
+                  hasBothBonuses
+                    ? 'z-10 hover:z-30 hover:-translate-y-2'
+                    : 'z-20 hover:z-30 hover:-translate-y-1'
+                }`}
+                title="En Uzun Yol (2 Zafer Puanı)"
+              >
+                <TableCard
+                  id="table-bonus-longest-route"
+                  type="longest_route"
+                  scale={scale}
+                  baseWidth={bonusBaseW}
+                  baseHeight={bonusBaseH}
+                  onInspect={() => onInspectCard('longest_route')}
+                />
+              </div>
+            )}
 
-          {/* Henüz hiç kimse kazanmadıysa Masada market hizasında duran "En Güçlü Ordu" Kartı */}
-          {!view.largestArmyOwner && (
-            <TableCard
-              id="table-bonus-largest-army"
-              type="largest_army"
-              scale={scale}
-              baseWidth={96}
-              baseHeight={140}
-              onInspect={() => onInspectCard('largest_army')}
-            />
-          )}
+            {/* Henüz hiç kimse kazanmadıysa Masadaki "En Güçlü Ordu" Kartı */}
+            {hasArmyBonus && (
+              <div
+                className={`absolute left-0 transition-all duration-200 ${
+                  hasBothBonuses
+                    ? 'z-20 hover:z-30 hover:-translate-y-1'
+                    : 'z-20 hover:z-30 hover:-translate-y-1'
+                }`}
+                style={{
+                  top: hasBothBonuses ? `${Math.round(bonusShiftY * scale)}px` : 0,
+                }}
+                title="En Güçlü Ordu (2 Zafer Puanı)"
+              >
+                <TableCard
+                  id="table-bonus-largest-army"
+                  type="largest_army"
+                  scale={scale}
+                  baseWidth={bonusBaseW}
+                  baseHeight={bonusBaseH}
+                  onInspect={() => onInspectCard('largest_army')}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -261,6 +301,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
       <DeckBrowserModal
         deckType={browsingDeck}
         onClose={() => setBrowsingDeck(null)}
+        metropolisSide={view.config.metropolisSide}
       />
     </div>
   );

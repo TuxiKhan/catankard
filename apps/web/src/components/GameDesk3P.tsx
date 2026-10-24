@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRightLeft,
   CheckCircle2,
@@ -13,6 +13,15 @@ import { FannedHand } from './FannedHand.tsx';
 import { GameMat } from './GameMat.tsx';
 import { useDraggablePlacement } from '../lib/useDraggablePlacement.ts';
 import { createSafeZoneClamper } from '../lib/safePlacementBoundary.ts';
+
+const formatRemainingTime = (seconds: number): string => {
+  if (seconds >= 60) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${seconds}s`;
+};
 
 interface GameDesk3PProps {
   view: PlayerView;
@@ -59,9 +68,33 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
   const oppLeft = opponents[0];
   const oppRight = opponents[1];
 
-  const remainingSeconds = view.turnDeadline
-    ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
-    : null;
+  // Canlı Geri Sayım (turnDeadline bazlı 1s interval ile güncellenir)
+  const calculateRemaining = () => {
+    return view.turnDeadline
+      ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
+      : null;
+  };
+
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(calculateRemaining);
+
+  useEffect(() => {
+    setRemainingSeconds(calculateRemaining());
+
+    if (!view.turnDeadline) return;
+
+    const interval = setInterval(() => {
+      setRemainingSeconds(calculateRemaining());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [view.turnDeadline, view.activePlayerId]);
+
+  // Aktif oyuncu kendisi ise ve süre 10 saniye veya daha azsa uyarı ver
+  const isTimeWarning =
+    view.activePlayerId === view.you &&
+    remainingSeconds !== null &&
+    remainingSeconds <= 10 &&
+    remainingSeconds > 0;
 
   const handleSelectBuild = async (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
     if (!isActive) return;
@@ -134,6 +167,14 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
 
   return (
     <div className="relative w-full min-h-screen bg-[#180103] flex flex-col justify-between overflow-hidden">
+      {/* Son 10 Saniye Kırmızı Uyarı Çerçevesi & Vinyet Efekti */}
+      {isTimeWarning && (
+        <div
+          className="fixed inset-0 pointer-events-none z-40 border-4 sm:border-8 border-red-600/75 animate-pulse shadow-[inset_0_0_60px_rgba(220,38,38,0.5)] transition-opacity duration-300"
+          aria-hidden="true"
+        />
+      )}
+
       {/* 1. ÜST YÜZEN MINIMAL OYUN BARI */}
       <header className="fixed top-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-4 py-2 shadow-2xl flex items-center justify-between transition-all">
         {/* Sol: Tur & Sıra */}
@@ -193,14 +234,16 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         <div className="flex items-center gap-2.5">
           {remainingSeconds !== null && (
             <div
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                remainingSeconds <= 15
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
+                remainingSeconds <= 10
+                  ? 'border-red-500 bg-red-950/90 text-red-200 animate-pulse ring-2 ring-red-500/50 shadow-[0_0_12px_rgba(239,68,68,0.6)]'
+                  : remainingSeconds <= 15
                   ? 'border-red-500 bg-red-950/80 text-red-300 animate-pulse'
                   : 'border-amber-600/50 bg-slate-900 text-amber-400'
               }`}
             >
               <Clock size={13} />
-              <span>{remainingSeconds}s</span>
+              <span>{formatRemainingTime(remainingSeconds)}</span>
             </div>
           )}
 
@@ -314,8 +357,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       id={`${oppLeft}-bonus-longest-route`}
                       type="longest_route"
                       scale={0.78}
-                      baseWidth={125}
-                      baseHeight={186}
+                      baseWidth={160}
+                      baseHeight={108}
                       onInspect={() => onInspectCard('longest_route')}
                     />
                   )}
@@ -325,8 +368,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       id={`${oppLeft}-bonus-largest-army`}
                       type="largest_army"
                       scale={0.78}
-                      baseWidth={125}
-                      baseHeight={186}
+                      baseWidth={160}
+                      baseHeight={108}
                       onInspect={() => onInspectCard('largest_army')}
                     />
                   )}
@@ -415,8 +458,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       id={`${oppRight}-bonus-longest-route`}
                       type="longest_route"
                       scale={0.78}
-                      baseWidth={125}
-                      baseHeight={186}
+                      baseWidth={160}
+                      baseHeight={108}
                       onInspect={() => onInspectCard('longest_route')}
                     />
                   )}
@@ -426,8 +469,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       id={`${oppRight}-bonus-largest-army`}
                       type="largest_army"
                       scale={0.78}
-                      baseWidth={125}
-                      baseHeight={186}
+                      baseWidth={160}
+                      baseHeight={108}
                       onInspect={() => onInspectCard('largest_army')}
                     />
                   )}
@@ -564,8 +607,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 id="bonus-longest-route"
                 type="longest_route"
                 scale={1.0}
-                baseWidth={125}
-                baseHeight={186}
+                baseWidth={160}
+                baseHeight={108}
                 isDraggable={true}
                 position={cardPositions['bonus-longest-route']}
                 onPositionChange={(pos) => updateCardPosition('bonus-longest-route', pos)}
@@ -573,9 +616,9 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 clampPosition={createSafeZoneClamper({
                   layout: '3P',
                   handPosition: 'bottom-center',
-                  slotIndex: totalYouCards - 1,
+                  slotIndex: (youArea?.stacks.length ?? 1) + youRoadsCount + youKnightsCount,
                   totalSlots: totalYouCards,
-                  cardWidth: 125,
+                  cardWidth: 160,
                 })}
                 onInspect={() => onInspectCard('longest_route')}
               />
@@ -586,8 +629,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 id="bonus-largest-army"
                 type="largest_army"
                 scale={1.0}
-                baseWidth={125}
-                baseHeight={186}
+                baseWidth={160}
+                baseHeight={108}
                 isDraggable={true}
                 position={cardPositions['bonus-largest-army']}
                 onPositionChange={(pos) => updateCardPosition('bonus-largest-army', pos)}
@@ -595,9 +638,13 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 clampPosition={createSafeZoneClamper({
                   layout: '3P',
                   handPosition: 'bottom-center',
-                  slotIndex: totalYouCards - 1,
+                  slotIndex:
+                    (youArea?.stacks.length ?? 1) +
+                    youRoadsCount +
+                    youKnightsCount +
+                    (youHasRoute ? 1 : 0),
                   totalSlots: totalYouCards,
-                  cardWidth: 125,
+                  cardWidth: 160,
                 })}
                 onInspect={() => onInspectCard('largest_army')}
               />

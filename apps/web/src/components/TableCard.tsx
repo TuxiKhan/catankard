@@ -18,9 +18,9 @@ export interface TableCardProps {
   isStarting?: boolean;
   /** Boyutlandırma çarpanı */
   scale?: number;
-  /** Kart taban genişliği (varsayılan: 125px) */
+  /** Kart taban genişliği (varsayılan: 125px dikey, 160px bonus yatay) */
   baseWidth?: number;
-  /** Kart taban yüksekliği (varsayılan: 186px) */
+  /** Kart taban yüksekliği (varsayılan: 186px dikey, 108px bonus yatay) */
   baseHeight?: number;
   className?: string;
   /** Kart inceleme modalı tetikleyicisi */
@@ -42,8 +42,8 @@ export const TableCard: React.FC<TableCardProps> = ({
   type,
   isStarting = false,
   scale = 1,
-  baseWidth = 125,
-  baseHeight = 186,
+  baseWidth,
+  baseHeight,
   className = '',
   onInspect,
   isDraggable = false,
@@ -52,10 +52,27 @@ export const TableCard: React.FC<TableCardProps> = ({
   onDragChange,
   clampPosition,
 }) => {
-  const cardW = Math.round(baseWidth * scale);
-  const cardH = Math.round(baseHeight * scale);
+  const isBonus = type === 'longest_route' || type === 'largest_army';
 
-  // Kart görselini belirle
+  // Bonus kartlar varsayılan olarak yataydır (~160x108), yol/şövalye kartları ise dikeydir (125x186)
+  const defaultBaseWidth = isBonus ? 160 : 125;
+  const defaultBaseHeight = isBonus ? 108 : 186;
+
+  let effectiveBaseWidth = baseWidth ?? defaultBaseWidth;
+  let effectiveBaseHeight = baseHeight ?? defaultBaseHeight;
+
+  // Bonus kart olmasına rağmen üst bileşenden yanlışlıkla dikey boyutlar (width < height) girildiyse yatay orana dönüştür
+  if (isBonus && effectiveBaseWidth < effectiveBaseHeight) {
+    const ratio = 160 / 108;
+    const factor = effectiveBaseWidth / 125;
+    effectiveBaseWidth = Math.round(160 * factor);
+    effectiveBaseHeight = Math.round(effectiveBaseWidth / ratio);
+  }
+
+  const cardW = Math.round(effectiveBaseWidth * scale);
+  const cardH = Math.round(effectiveBaseHeight * scale);
+
+  // Kart görselini belirle (Tüm kartlar orijinal tam kart görseliyle render edilir)
   const getImageUrl = (): string => {
     if (type === 'road') {
       return isStarting
@@ -168,6 +185,9 @@ export const TableCard: React.FC<TableCardProps> = ({
       return;
     }
     e.stopPropagation();
+    if (!isDraggable && onInspect) {
+      onInspect(type);
+    }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {

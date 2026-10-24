@@ -152,44 +152,6 @@ function giveResourcesToPlayer(state, playerId, count) {
   return drawn;
 }
 
-// supabase/functions/_shared/engine/harvest.ts
-function executeHarvestPhase(state) {
-  const activePid = state.turnOrder[state.activePlayerIndex];
-  const draws = {};
-  const activePlayers = state.turnOrder.filter(
-    (pid) => !state.removedPlayers.includes(pid)
-  );
-  const startIdx = state.turnOrder.indexOf(activePid);
-  for (let i = 0; i < state.turnOrder.length; i++) {
-    const pid = state.turnOrder[(startIdx + i) % state.turnOrder.length];
-    if (!state.removedPlayers.includes(pid)) {
-      const drawn = giveResourcesToPlayer(state, pid, 1);
-      draws[pid] = (draws[pid] ?? 0) + drawn;
-    }
-  }
-  const activeArea = state.areas[activePid];
-  if (activeArea) {
-    let extraCards = 0;
-    for (const stack of activeArea.stacks) {
-      if (stack.top === "city") {
-        extraCards += 1;
-      } else if (stack.top === "metropolis") {
-        if (stack.metropolis?.side === "A") {
-          extraCards += 2;
-        } else if (stack.metropolis?.side === "B") {
-          extraCards += 1;
-        }
-      }
-    }
-    if (extraCards > 0) {
-      const extraDrawn = giveResourcesToPlayer(state, activePid, extraCards);
-      draws[activePid] = (draws[activePid] ?? 0) + extraDrawn;
-    }
-  }
-  state.log.push({ t: "harvest", draws });
-  return draws;
-}
-
 // supabase/functions/_shared/engine/actions.ts
 function checkAndReshuffleBuildingRow(state) {
   if (state.buildingRow.length < 5) return false;
@@ -428,9 +390,88 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      const { data: existingPlayer } = await supabase.from("room_players").select("*").eq("room_id", room.id).eq("user_id", userId).maybeSingle();
-      if (existingPlayer) {
-        return new Response(JSON.stringify({ ok: true, roomId: room.id }), {
+      const { data: existingPlayerById } = await supabase.from("room_players").select("*").eq("room_id", room.id).eq("user_id", userId).maybeSingle();
+      if (existingPlayerById) {
+        const updateFields = { last_seen_at: (/* @__PURE__ */ new Date()).toISOString() };
+        if (name && name.trim()) {
+          updateFields.name = name.trim();
+        }
+        await supabase.from("room_players").update(updateFields).eq("room_id", room.id).eq("user_id", userId);
+        return new Response(JSON.stringify({ ok: true, roomId: room.id, reconnected: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const { data: currentPlayers } = await supabase.from("room_players").select("*").eq("room_id", room.id).order("seat_index", { ascending: true });
+      const currentPlayersList = currentPlayers ?? [];
+      const trimmedName = name ? name.trim().toLowerCase() : "";
+      const existingPlayerByName = trimmedName ? currentPlayersList.find((p) => p.name.trim().toLowerCase() === trimmedName) : null;
+      if (existingPlayerByName) {
+        const oldUserId = existingPlayerByName.user_id;
+        await supabase.from("room_players").delete().eq("room_id", room.id).eq("user_id", oldUserId);
+        await supabase.from("room_players").insert({
+          room_id: room.id,
+          user_id: userId,
+          name: existingPlayerByName.name,
+          seat_index: existingPlayerByName.seat_index,
+          is_host: existingPlayerByName.is_host,
+          last_seen_at: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        if (room.created_by === oldUserId) {
+          await supabase.from("rooms").update({ created_by: userId }).eq("id", room.id);
+        }
+        if (room.status === "playing") {
+          const { data: gsRow } = await supabase.from("game_states").select("*").eq("room_id", room.id).single();
+          if (gsRow && gsRow.state) {
+            const state = gsRow.state;
+            if (state.turnOrder) {
+              state.turnOrder = state.turnOrder.map((id) => id === oldUserId ? userId : id);
+            }
+            if (state.config?.players) {
+              state.config.players = state.config.players.map(
+                (p) => p.id === oldUserId ? { ...p, id: userId } : p
+              );
+            }
+            if (state.hands && state.hands[oldUserId]) {
+              state.hands[userId] = state.hands[oldUserId];
+              delete state.hands[oldUserId];
+            }
+            if (state.areas && state.areas[oldUserId]) {
+              state.areas[userId] = state.areas[oldUserId];
+              delete state.areas[oldUserId];
+            }
+            if (state.longestRouteOwner === oldUserId) state.longestRouteOwner = userId;
+            if (state.largestArmyOwner === oldUserId) state.largestArmyOwner = userId;
+            if (state.winner === oldUserId) state.winner = userId;
+            if (state.removedPlayers) {
+              state.removedPlayers = state.removedPlayers.map((id) => id === oldUserId ? userId : id);
+            }
+            if (state.tradeOffers) {
+              state.tradeOffers.forEach((o) => {
+                if (o.fromPlayerId === oldUserId) o.fromPlayerId = userId;
+                if (o.toPlayerId === oldUserId) o.toPlayerId = userId;
+              });
+            }
+            if (state.pendingDecisions) {
+              state.pendingDecisions.forEach((d) => {
+                if (d.playerId === oldUserId) d.playerId = userId;
+              });
+            }
+            await supabase.from("game_states").update({
+              state,
+              version: gsRow.version + 1,
+              updated_at: (/* @__PURE__ */ new Date()).toISOString()
+            }).eq("room_id", room.id);
+            await supabase.from("player_views").delete().eq("room_id", room.id).eq("user_id", oldUserId);
+            const view = getPlayerView(state, userId);
+            await supabase.from("player_views").upsert({
+              room_id: room.id,
+              user_id: userId,
+              view,
+              updated_at: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        }
+        return new Response(JSON.stringify({ ok: true, roomId: room.id, reconnected: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
@@ -440,15 +481,14 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      const { data: currentPlayers } = await supabase.from("room_players").select("seat_index").eq("room_id", room.id);
-      const count = currentPlayers?.length ?? 0;
+      const count = currentPlayersList.length;
       if (count >= room.max_players) {
         return new Response(JSON.stringify({ ok: false, code: "ROOM_FULL", message: "Oda dolu." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
-      const occupiedSeats = new Set((currentPlayers ?? []).map((p) => p.seat_index));
+      const occupiedSeats = new Set(currentPlayersList.map((p) => p.seat_index));
       let availableSeat = 0;
       while (occupiedSeats.has(availableSeat)) {
         availableSeat++;
@@ -467,7 +507,41 @@ serve(async (req) => {
     }
     if (op === "leave_room") {
       const { roomId } = body;
-      await supabase.from("room_players").delete().eq("room_id", roomId).eq("user_id", userId);
+      if (!roomId) {
+        return new Response(JSON.stringify({ ok: false, code: "MISSING_ROOM_ID", message: "roomId belirtilmelidir." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).maybeSingle();
+      if (!room) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const { data: otherPlayersData } = await supabase.from("room_players").select("*").eq("room_id", roomId).neq("user_id", userId).order("seat_index", { ascending: true });
+      const otherPlayers = otherPlayersData ?? [];
+      const isHost = room.created_by === userId;
+      if (otherPlayers.length > 0) {
+        if (isHost) {
+          const newHost = otherPlayers[0];
+          await supabase.from("rooms").update({ created_by: newHost.user_id }).eq("id", roomId);
+          await supabase.from("room_players").update({ is_host: true }).eq("room_id", roomId).eq("user_id", newHost.user_id);
+        }
+        if (room.status === "lobby") {
+          await supabase.from("room_players").delete().eq("room_id", roomId).eq("user_id", userId);
+        } else {
+          await supabase.from("room_players").update({ is_host: false, last_seen_at: (/* @__PURE__ */ new Date(0)).toISOString() }).eq("room_id", roomId).eq("user_id", userId);
+        }
+      } else {
+        if (room.status === "lobby") {
+          await supabase.from("room_players").delete().eq("room_id", roomId).eq("user_id", userId);
+          await supabase.from("rooms").delete().eq("id", roomId);
+        } else {
+          await supabase.from("room_players").update({ is_host: false, last_seen_at: (/* @__PURE__ */ new Date(0)).toISOString() }).eq("room_id", roomId).eq("user_id", userId);
+          await supabase.from("rooms").update({ status: "abandoned" }).eq("id", roomId);
+        }
+      }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -475,7 +549,32 @@ serve(async (req) => {
     if (op === "start_game") {
       const { roomId } = body;
       const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).single();
-      if (!room || room.created_by !== userId) {
+      if (!room) {
+        return new Response(JSON.stringify({ ok: false, code: "ROOM_NOT_FOUND", message: "Oda bulunamad\u0131." }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      let isHost = room.created_by === userId;
+      if (!isHost) {
+        const now2 = Date.now();
+        const { data: hostPlayer } = await supabase.from("room_players").select("last_seen_at").eq("room_id", roomId).eq("user_id", room.created_by).maybeSingle();
+        const hostLastSeen = hostPlayer ? new Date(hostPlayer.last_seen_at).getTime() : 0;
+        const hostOffline = !hostPlayer || now2 - hostLastSeen > 6e4;
+        if (hostOffline) {
+          const { data: activePlayers } = await supabase.from("room_players").select("*").eq("room_id", roomId).order("seat_index", { ascending: true });
+          const onlinePlayers = (activePlayers ?? []).filter(
+            (p) => now2 - new Date(p.last_seen_at).getTime() <= 6e4
+          );
+          if (onlinePlayers.length > 0 && onlinePlayers[0].user_id === userId) {
+            isHost = true;
+            await supabase.from("rooms").update({ created_by: userId }).eq("id", roomId);
+            await supabase.from("room_players").update({ is_host: false }).eq("room_id", roomId).eq("user_id", room.created_by);
+            await supabase.from("room_players").update({ is_host: true }).eq("room_id", roomId).eq("user_id", userId);
+          }
+        }
+      }
+      if (!isHost) {
         return new Response(JSON.stringify({ ok: false, code: "UNAUTHORIZED", message: "Yaln\u0131zca kurucu oyunu ba\u015Flatabilir." }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -519,7 +618,32 @@ serve(async (req) => {
     if (op === "end_game") {
       const { roomId } = body;
       const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).single();
-      if (!room || room.created_by !== userId) {
+      if (!room) {
+        return new Response(JSON.stringify({ ok: false, code: "ROOM_NOT_FOUND", message: "Oda bulunamad\u0131." }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      let isHost = room.created_by === userId;
+      if (!isHost) {
+        const now = Date.now();
+        const { data: hostPlayer } = await supabase.from("room_players").select("last_seen_at").eq("room_id", roomId).eq("user_id", room.created_by).maybeSingle();
+        const hostLastSeen = hostPlayer ? new Date(hostPlayer.last_seen_at).getTime() : 0;
+        const hostOffline = !hostPlayer || now - hostLastSeen > 6e4;
+        if (hostOffline) {
+          const { data: activePlayers } = await supabase.from("room_players").select("*").eq("room_id", roomId).order("seat_index", { ascending: true });
+          const onlinePlayers = (activePlayers ?? []).filter(
+            (p) => now - new Date(p.last_seen_at).getTime() <= 6e4
+          );
+          if (onlinePlayers.length > 0 && onlinePlayers[0].user_id === userId) {
+            isHost = true;
+            await supabase.from("rooms").update({ created_by: userId }).eq("id", roomId);
+            await supabase.from("room_players").update({ is_host: false }).eq("room_id", roomId).eq("user_id", room.created_by);
+            await supabase.from("room_players").update({ is_host: true }).eq("room_id", roomId).eq("user_id", userId);
+          }
+        }
+      }
+      if (!isHost) {
         return new Response(JSON.stringify({ ok: false, code: "UNAUTHORIZED", message: "Yaln\u0131zca kurucu oyunu sonland\u0131rabilir." }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" }

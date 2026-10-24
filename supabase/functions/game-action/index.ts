@@ -58,6 +58,15 @@ serve(async (req) => {
       });
     }
 
+    const now = Date.now();
+
+    // İstekte bulunan oyuncunun last_seen_at değerini güncelle
+    await supabase
+      .from('room_players')
+      .update({ last_seen_at: new Date(now).toISOString() })
+      .eq('room_id', roomId)
+      .eq('user_id', userId);
+
     // İyimser kilitleme ile game_state çek
     const { data: row, error: fetchErr } = await supabase
       .from('game_states')
@@ -74,20 +83,54 @@ serve(async (req) => {
 
     const currentState: GameState = row.state;
     const currentVersion: number = row.version;
-    const now = Date.now();
+
+    // Oda ve kurucu bilgisi kontrolü
+    const { data: room } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+
+    let isHostOffline = false;
+    if (room) {
+      const { data: hostPlayer } = await supabase
+        .from('room_players')
+        .select('last_seen_at')
+        .eq('room_id', roomId)
+        .eq('user_id', room.created_by)
+        .maybeSingle();
+
+      const hostLastSeen = hostPlayer ? new Date(hostPlayer.last_seen_at).getTime() : 0;
+      isHostOffline = !hostPlayer || (now - hostLastSeen > 60_000);
+    }
 
     let result;
     if (tick) {
       result = applyTick(currentState, now);
     } else if (action) {
-      // remove_player için backend ek doğrulama: hedef 60 sn'dir kopuk mu?
+      // remove_player için backend ek doğrulama:
       if (action.type === 'remove_player') {
+        const isHost = room?.created_by === userId;
+
+        // Kuruculuk hakkı: Kurucu aktifse yalnızca kurucu atabilir.
+        // Kurucu 60 saniyeden uzun süredir offline ise, diğer aktif oyuncular da kuruculuk hakkını kullanabilir.
+        if (!isHost && !isHostOffline) {
+          return new Response(JSON.stringify({
+            ok: false,
+            code: 'UNAUTHORIZED',
+            message: 'Yalnızca kurucu oyundan oyuncu atabilir.',
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const { data: targetPlayer } = await supabase
           .from('room_players')
           .select('last_seen_at')
           .eq('room_id', roomId)
           .eq('user_id', action.playerId)
-          .single();
+          .maybeSingle();
 
         if (targetPlayer) {
           const lastSeen = new Date(targetPlayer.last_seen_at).getTime();
@@ -136,6 +179,29 @@ serve(async (req) => {
         status: 409,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Eğer remove_player yapıldıysa ve atılan oyuncu kurucuysa veya kurucu offline ise kuruculuğu devret
+    if (action?.type === 'remove_player' && room) {
+      const removedId = action.playerId;
+      if (removedId === room.created_by || isHostOffline) {
+        const { data: remainingPlayers } = await supabase
+          .from('room_players')
+          .select('*')
+          .eq('room_id', roomId)
+          .neq('user_id', removedId)
+          .order('seat_index', { ascending: true });
+
+        const nextHost = (remainingPlayers ?? []).find(
+          (p: any) => p.user_id !== room.created_by && (now - new Date(p.last_seen_at).getTime()) <= 60_000
+        ) ?? (remainingPlayers ?? []).find((p: any) => p.user_id !== removedId);
+
+        if (nextHost && nextHost.user_id !== room.created_by) {
+          await supabase.from('rooms').update({ created_by: nextHost.user_id }).eq('id', roomId);
+          await supabase.from('room_players').update({ is_host: false }).eq('room_id', roomId).eq('user_id', room.created_by);
+          await supabase.from('room_players').update({ is_host: true }).eq('room_id', roomId).eq('user_id', nextHost.user_id);
+        }
+      }
     }
 
     // Tüm oyuncuların player_view'larını güncelle

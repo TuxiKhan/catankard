@@ -6,6 +6,7 @@ export type DeckType = 'resource' | 'event' | 'metropolis' | 'building';
 export interface DeckBrowserModalProps {
   deckType: DeckType | null;
   onClose: () => void;
+  metropolisSide?: 'A' | 'B';
 }
 
 interface DeckCardItem {
@@ -44,7 +45,11 @@ const DECK_CARDS: Record<DeckType, DeckCardItem[]> = {
   ],
 };
 
-export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({ deckType, onClose }) => {
+export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
+  deckType,
+  onClose,
+  metropolisSide,
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,7 +62,21 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({ deckType, on
 
   if (!deckType) return null;
 
-  const cards = DECK_CARDS[deckType] ?? [];
+  let cards = DECK_CARDS[deckType] ?? [];
+  if (deckType === 'metropolis') {
+    if (metropolisSide === 'A') {
+      cards = cards.filter((c) => c.id === 'metro_A');
+    } else if (metropolisSide === 'B') {
+      cards = cards.filter((c) =>
+        [
+          'metro_B_knights',
+          'metro_B_roads',
+          'metro_B_longest_route',
+          'metro_B_largest_army',
+        ].includes(c.id)
+      );
+    }
+  }
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -90,35 +109,41 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({ deckType, on
       </button>
 
       {/* Sol Kaydırma Oku */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          scroll('left');
-        }}
-        className="hidden md:flex absolute left-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
-        title="Sola Kaydır"
-      >
-        <ChevronLeft size={30} />
-      </button>
+      {cards.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            scroll('left');
+          }}
+          className="hidden md:flex absolute left-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
+          title="Sola Kaydır"
+        >
+          <ChevronLeft size={30} />
+        </button>
+      )}
 
       {/* Sağ Kaydırma Oku */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          scroll('right');
-        }}
-        className="hidden md:flex absolute right-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
-        title="Sağa Kaydır"
-      >
-        <ChevronRight size={30} />
-      </button>
+      {cards.length > 1 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            scroll('right');
+          }}
+          className="hidden md:flex absolute right-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
+          title="Sağa Kaydır"
+        >
+          <ChevronRight size={30} />
+        </button>
+      )}
 
       {/* Yatay Kart Gezinme Karuseli */}
       <div
         ref={scrollRef}
         onWheel={handleWheel}
         onClick={(e) => e.stopPropagation()}
-        className="overflow-x-auto flex items-center gap-6 p-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing select-none"
+        className={`overflow-x-auto flex items-center gap-6 p-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing select-none ${
+          cards.length <= 1 ? 'justify-center' : ''
+        }`}
       >
         {cards.map((card) => (
           <div

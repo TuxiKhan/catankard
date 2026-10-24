@@ -1,7 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { PlayerView } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
-import { ImageIcon } from 'lucide-react';
+import { Palette, Check } from 'lucide-react';
+
+export type TableThemeId = 'bordo' | 'emerald' | 'midnight' | 'anthracite';
+
+export interface TableTheme {
+  id: TableThemeId;
+  name: string;
+  bg: string;
+  radial: string;
+  border: string;
+  outerBg: string;
+  swatch: string;
+}
+
+export const TABLE_THEMES: Record<TableThemeId, TableTheme> = {
+  bordo: {
+    id: 'bordo',
+    name: 'Bordo Klasik',
+    bg: '#700913',
+    radial: 'radial-gradient(ellipse at 50% 50%, #8c0d19 0%, #700913 45%, #46060c 80%, #1e0204 100%)',
+    border: '#4a0d13',
+    outerBg: '#150103',
+    swatch: '#8c0d19',
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'Zümrüt Yeşili',
+    bg: '#0d522c',
+    radial: 'radial-gradient(ellipse at 50% 50%, #166534 0%, #0d522c 45%, #052e16 80%, #021a0d 100%)',
+    border: '#064e3b',
+    outerBg: '#02180e',
+    swatch: '#166534',
+  },
+  midnight: {
+    id: 'midnight',
+    name: 'Gece Mavisi',
+    bg: '#0f2b48',
+    radial: 'radial-gradient(ellipse at 50% 50%, #1e3a8a 0%, #0f2b48 45%, #081d33 80%, #030c17 100%)',
+    border: '#1e3a8a',
+    outerBg: '#040d18',
+    swatch: '#1e3a8a',
+  },
+  anthracite: {
+    id: 'anthracite',
+    name: 'Kömür / Antrasit',
+    bg: '#1e242b',
+    radial: 'radial-gradient(ellipse at 50% 50%, #334155 0%, #1e242b 45%, #0f172a 80%, #020617 100%)',
+    border: '#334155',
+    outerBg: '#0b0f14',
+    swatch: '#334155',
+  },
+};
+
+const THEME_LIST: TableTheme[] = [
+  TABLE_THEMES.bordo,
+  TABLE_THEMES.emerald,
+  TABLE_THEMES.midnight,
+  TABLE_THEMES.anthracite,
+];
+
+const STORAGE_KEY = 'catankard_table_theme';
 
 export interface GameMatProps {
   playerCount: 3 | 4;
@@ -14,7 +74,7 @@ export interface GameMatProps {
 }
 
 export const GameMat: React.FC<GameMatProps> = ({
-  playerCount,
+  playerCount: _playerCount,
   children,
   view,
   onInspectCard,
@@ -22,28 +82,59 @@ export const GameMat: React.FC<GameMatProps> = ({
   canBuildMetropolis,
   className = '',
 }) => {
-  const [usePhotoBg, setUsePhotoBg] = useState(false);
+  const [themeId, setThemeId] = useState<TableThemeId>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && saved in TABLE_THEMES) {
+          return saved as TableThemeId;
+        }
+      }
+    } catch {
+      // localStorage erişim hatası olursa varsayılana dön
+    }
+    return 'bordo';
+  });
 
-  // Referans görsel yolları
-  const bgImage =
-    playerCount === 3
-      ? '/assets/table/catan 3 player game main desk.png'
-      : '/assets/table/catan 4 player game main desk.png';
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
+
+  const handleSelectTheme = (id: TableThemeId) => {
+    setThemeId(id);
+    try {
+      localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      // localStorage hatası durumunda sessiz kal
+    }
+  };
+
+  const currentTheme = TABLE_THEMES[themeId] || TABLE_THEMES.bordo;
 
   return (
     <div
-      className={`relative w-full min-h-screen overflow-x-hidden bg-[#150103] flex items-center justify-center p-1 md:p-3 select-none ${className}`}
+      className={`relative w-full min-h-screen overflow-x-hidden flex items-center justify-center p-1 md:p-3 select-none transition-colors duration-500 ${className}`}
+      style={{ backgroundColor: currentTheme.outerBg }}
     >
       {/* ============================================================== */}
-      {/* KIRMIZI KADİFE / KEÇE OYUN MASASI ZEMİNİ (#700913 BORDO GRADYAN) */}
+      {/* ÇUHA / KEÇE OYUN MASASI ZEMİNİ (SEÇİLEN TEMA RADYAL GEÇİŞİ)     */}
       {/* ============================================================== */}
       <div
-        className="relative w-full h-[96vh] min-h-[720px] max-w-[1600px] aspect-auto lg:aspect-[16/9] rounded-3xl border-4 border-[#4a0d13] shadow-[0_20px_70px_rgba(0,0,0,0.95),inset_0_0_150px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col justify-between transition-all"
+        className="relative w-full h-[96vh] min-h-[720px] max-w-[1600px] aspect-auto lg:aspect-[16/9] rounded-3xl border-4 shadow-[0_20px_70px_rgba(0,0,0,0.95),inset_0_0_150px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col justify-between transition-all duration-300"
         style={{
-          backgroundColor: '#700913',
-          backgroundImage: usePhotoBg
-            ? `url("${bgImage}")`
-            : 'radial-gradient(ellipse at 50% 50%, #8c0d19 0%, #700913 45%, #46060c 80%, #1e0204 100%)',
+          backgroundColor: currentTheme.bg,
+          backgroundImage: currentTheme.radial,
+          borderColor: currentTheme.border,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -57,17 +148,59 @@ export const GameMat: React.FC<GameMatProps> = ({
           }}
         />
 
-        {/* Masa Dokusu / Orijinal Fotoğraf Geçiş Butonu */}
-        <div className="absolute top-3.5 right-4 z-30">
-          <button
-            type="button"
-            onClick={() => setUsePhotoBg(!usePhotoBg)}
-            title={usePhotoBg ? 'Kırmızı Kadife Keçe Dokusuna Geç' : 'Orijinal Referans Masa Fotoğrafına Geç'}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] sm:text-xs rounded-full bg-black/60 hover:bg-black/85 text-amber-200 border border-amber-600/40 backdrop-blur-md transition shadow-lg"
-          >
-            <ImageIcon size={12} />
-            <span className="hidden sm:inline">{usePhotoBg ? 'Kadife Dokusu' : 'Masa Fotoğrafı'}</span>
-          </button>
+        {/* Masa Rengi Teması Seçici */}
+        <div className="absolute top-3.5 right-4 z-40" ref={menuRef}>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              title="Masa Çuhası Rengini Değiştir"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs rounded-full bg-black/60 hover:bg-black/85 text-amber-200 border border-amber-600/40 backdrop-blur-md transition shadow-lg group cursor-pointer"
+            >
+              <Palette size={13} className="text-amber-300 transition-transform group-hover:rotate-12" />
+              <span className="hidden sm:inline font-medium">{currentTheme.name}</span>
+              <span
+                className="w-2.5 h-2.5 rounded-full border border-white/50 shadow-inner"
+                style={{ backgroundColor: currentTheme.swatch }}
+              />
+            </button>
+
+            {/* Tema Açılır Menüsü */}
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 p-1.5 rounded-xl bg-black/90 border border-amber-600/40 backdrop-blur-md shadow-2xl flex flex-col gap-1 min-w-[155px] z-50">
+                <div className="px-2 py-1 text-[10px] font-semibold text-amber-400/80 uppercase tracking-wider border-b border-amber-600/20 mb-0.5">
+                  Masa Çuhası Rengi
+                </div>
+                {THEME_LIST.map((theme) => {
+                  const isSelected = theme.id === themeId;
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => {
+                        handleSelectTheme(theme.id);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition text-left cursor-pointer ${
+                        isSelected
+                          ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                          : 'text-zinc-300 hover:bg-white/10 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span
+                        className={`w-3.5 h-3.5 rounded-full border shadow-sm shrink-0 ${
+                          isSelected ? 'border-amber-300 scale-110' : 'border-white/40'
+                        }`}
+                        style={{ backgroundColor: theme.swatch }}
+                      />
+                      <span className="truncate">{theme.name}</span>
+                      {isSelected && <Check size={13} className="ml-auto text-amber-400 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ============================================================== */}

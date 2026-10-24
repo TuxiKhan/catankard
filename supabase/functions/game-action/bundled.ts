@@ -947,6 +947,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+    const now = Date.now();
+    await supabase.from("room_players").update({ last_seen_at: new Date(now).toISOString() }).eq("room_id", roomId).eq("user_id", userId);
     const { data: row, error: fetchErr } = await supabase.from("game_states").select("*").eq("room_id", roomId).single();
     if (fetchErr || !row) {
       return new Response(JSON.stringify({ ok: false, code: "GAME_NOT_FOUND", message: "Oyun durumu bulunamad\u0131." }), {
@@ -956,13 +958,30 @@ serve(async (req) => {
     }
     const currentState = row.state;
     const currentVersion = row.version;
-    const now = Date.now();
+    const { data: room } = await supabase.from("rooms").select("*").eq("id", roomId).single();
+    let isHostOffline = false;
+    if (room) {
+      const { data: hostPlayer } = await supabase.from("room_players").select("last_seen_at").eq("room_id", roomId).eq("user_id", room.created_by).maybeSingle();
+      const hostLastSeen = hostPlayer ? new Date(hostPlayer.last_seen_at).getTime() : 0;
+      isHostOffline = !hostPlayer || now - hostLastSeen > 6e4;
+    }
     let result;
     if (tick) {
       result = applyTick(currentState, now);
     } else if (action) {
       if (action.type === "remove_player") {
-        const { data: targetPlayer } = await supabase.from("room_players").select("last_seen_at").eq("room_id", roomId).eq("user_id", action.playerId).single();
+        const isHost = room?.created_by === userId;
+        if (!isHost && !isHostOffline) {
+          return new Response(JSON.stringify({
+            ok: false,
+            code: "UNAUTHORIZED",
+            message: "Yaln\u0131zca kurucu oyundan oyuncu atabilir."
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        const { data: targetPlayer } = await supabase.from("room_players").select("last_seen_at").eq("room_id", roomId).eq("user_id", action.playerId).maybeSingle();
         if (targetPlayer) {
           const lastSeen = new Date(targetPlayer.last_seen_at).getTime();
           if (now - lastSeen < 6e4) {
@@ -999,6 +1018,20 @@ serve(async (req) => {
         status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
+    if (action?.type === "remove_player" && room) {
+      const removedId = action.playerId;
+      if (removedId === room.created_by || isHostOffline) {
+        const { data: remainingPlayers } = await supabase.from("room_players").select("*").eq("room_id", roomId).neq("user_id", removedId).order("seat_index", { ascending: true });
+        const nextHost = (remainingPlayers ?? []).find(
+          (p) => p.user_id !== room.created_by && now - new Date(p.last_seen_at).getTime() <= 6e4
+        ) ?? (remainingPlayers ?? []).find((p) => p.user_id !== removedId);
+        if (nextHost && nextHost.user_id !== room.created_by) {
+          await supabase.from("rooms").update({ created_by: nextHost.user_id }).eq("id", roomId);
+          await supabase.from("room_players").update({ is_host: false }).eq("room_id", roomId).eq("user_id", room.created_by);
+          await supabase.from("room_players").update({ is_host: true }).eq("room_id", roomId).eq("user_id", nextHost.user_id);
+        }
+      }
     }
     for (const pid of nextState.turnOrder) {
       const view = getPlayerView(nextState, pid);
