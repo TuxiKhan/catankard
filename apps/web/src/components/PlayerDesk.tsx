@@ -2,6 +2,7 @@ import React from 'react';
 import type { PlayerArea, PlayerId, PlayerView, Resource } from '@catankard/engine';
 import { CardStack } from './CardStack.tsx';
 import { FannedHand } from './FannedHand.tsx';
+import { useDraggablePlacement } from '../lib/useDraggablePlacement.ts';
 
 interface PlayerDeskProps {
   playerId: PlayerId;
@@ -28,6 +29,7 @@ export const PlayerDesk: React.FC<PlayerDeskProps> = ({
   const area: PlayerArea = p.area;
   const isTurn = view.activePlayerId === playerId;
   const isYou = view.you === playerId;
+  const { positions: stackPositions, updatePosition: updateStackPosition } = useDraggablePlacement();
 
   // Yol takas oranı hesapla
   const roadRatio =
@@ -119,6 +121,9 @@ export const PlayerDesk: React.FC<PlayerDeskProps> = ({
                     onInspect={onInspectCard}
                     onSelectUpgrade={onSelectStack}
                     size="sm"
+                    isDraggable={isYou}
+                    position={stackPositions[stack.id]}
+                    onPositionChange={(pos) => updateStackPosition(stack.id, pos)}
                   />
                 );
               })}

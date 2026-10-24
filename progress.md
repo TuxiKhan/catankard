@@ -3,11 +3,11 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 5 – Fiziksel Masa & Masaüstü Deneyimi Tamamlandı, Dev & Test Aktif
+- **Aşama:** STEP 6 – Fiziksel Masaüstü Kart İyileştirmeleri (Kart Büyütme, Serbest Sürükleme, Parlama, Köşe Geometrisi ve Güvenli Bölge) Tamamlandı
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
 - **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1
 - **Canlı Test:** `http://localhost:5173/`
-- **Son güncelleme:** 2026-10-23
+- **Son güncelleme:** 2026-10-24
 
 ## Kaynak Materyal
 | Kaynak | Konum | Not |
@@ -33,7 +33,14 @@
   - Dikey ofsetli kart istifleme: Köy -> Şehir -> Büyükşehir dikey 28px kaydırma (`CardStack.tsx`)
   - Çift altın çerçeveli parşömen kart inceleme modalı (`CardModal.tsx`)
 - [x] 3 ve 4 oyunculu masa düzenleri (`GameDesk3P.tsx`, `GameDesk4P.tsx`)
-- [x] Vite prodüksiyon derlemesi (0 hata) ve canlı dev sunucusu (`http://localhost:5173/`)
+- [x] Masaüstü & Kart İyileştirmeleri (4 Paralel Sub-Agent):
+  - [x] Masadaki kartların büyütülmesi (BuildingRowMat taban ~96x140 px, CardStack taban ~110x160 px, katman kayması 34 px).
+  - [x] Masaya konan kartların kullanıcının kendi alanında serbestçe sürüklenip bırakılabilmesi (`useDraggablePlacement`, `CardStack.tsx` pointer events, koordinat kalıcılığı).
+  - [x] Mağaza kartlarında hover parlaması (`canAfford.ts`, kaynaklar veya yol ikamesi yetiyorsa altın sarısı ışıltı).
+  - [x] Kartların üzerindeki tüm butonların ("İnşa Et", "İncele", "Yükselt", "Göz" ikonları) tamamen kaldırılması; doğrudan kart tıklaması ve sağ/çift tık inceleme.
+  - [x] Oyuncu kart destelerinin/yelpazelerinin (FannedHand) yuvarlanma merkezlerinin ilgili köşelere (`top-left`, `top-right`, `bottom-left`, `bottom-right`) bağlanması ve masanın içine doğal açılı yayılımı.
+  - [x] Eldeki kartların masa kartlarını örtmesini engellemek için alt boşluğun `pb-[230px]` / `pb-[224px]` düzenlenmesi, el kartları bölgesinin yasak bölge olarak sınırlandırılması (`safePlacementBoundary.ts`) ve otomatik sınır yaslama.
+- [x] Vite prodüksiyon derlemesi (0 hata) ve 15 vitest motor testi (%100 başarı)
 - [ ] 3 ve 4 oyunculu çoklu sekme canlı maç testi ve kullanıcı kabulü
 
 ## Tamamlanan Detaylar (PDF Doğrulaması)

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
   ArrowRightLeft,
+  Ban,
   CheckCircle2,
   Clock,
   Crown,
   LogOut,
   Shield,
   Milestone,
+  RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
@@ -14,6 +17,8 @@ import { BuildModal } from './BuildModal.tsx';
 import { CardStack } from './CardStack.tsx';
 import { FannedHand } from './FannedHand.tsx';
 import { GameMat } from './GameMat.tsx';
+import { useDraggablePlacement } from '../lib/useDraggablePlacement.ts';
+import { createSafeZoneClamper, HAND_ZONE_CONFIG } from '../lib/safePlacementBoundary.ts';
 
 interface GameDesk3PProps {
   view: PlayerView;
@@ -49,6 +54,15 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     type: 'city' | 'metropolis';
     substitution?: { replace: Resource; pay: Resource };
   } | null>(null);
+
+  // Masadaki kartların serbestçe sürüklenip bırakılması (Draggable Placement)
+  const {
+    positions: stackPositions,
+    updatePosition: updateStackPosition,
+    resetAllPositions: resetAllStackPositions,
+  } = useDraggablePlacement();
+
+  const [isCardDragging, setIsCardDragging] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -312,11 +326,37 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           />
         </div>
 
-        {/* Alt Alan: Kendi Masan (Stacks & Fanned Hand) */}
-        <div className="w-full flex flex-col items-center gap-2 pb-14">
+        {/* Alt Alan: Kendi Masan (Güvenli Masa Alanı & Fanned Hand) */}
+        <div className="w-full flex flex-col items-center gap-2 pb-[230px] relative">
+          {/* Güvenli Masa Yerleşim Çizgisi ve Düzeni Sıfırla Düğmesi */}
+          <div
+            className={`w-full max-w-4xl flex items-center justify-between px-4 mb-1 transition-opacity duration-300 ${
+              isCardDragging || Object.keys(stackPositions).length > 0
+                ? 'opacity-100'
+                : 'opacity-40 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-black/60 backdrop-blur-xs border border-amber-500/30 text-[11px] text-amber-300">
+              <ShieldCheck size={13} className="text-emerald-400" />
+              <span>Güvenli Masa Alanı (Yerleşimleriniz)</span>
+            </div>
+
+            {Object.keys(stackPositions).length > 0 && (
+              <button
+                type="button"
+                onClick={resetAllStackPositions}
+                title="Kartları varsayılan kavisli sıraya diz"
+                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-amber-300 border border-amber-600/40 text-xs shadow-lg transition active:scale-95"
+              >
+                <RotateCcw size={11} />
+                <span>Düzeni Sıfırla</span>
+              </button>
+            )}
+          </div>
+
           {/* Yerleşim Yığınların (Settlement / City / Metropolis) */}
-          <div className="flex items-end justify-center gap-3 flex-wrap">
-            {youArea?.stacks.map((stack) => {
+          <div className="flex items-end justify-center gap-4 sm:gap-6 flex-wrap">
+            {youArea?.stacks.map((stack, index, arr) => {
               const isSettlement = stack.top === 'settlement';
               const isCity = stack.top === 'city';
 
@@ -325,16 +365,39 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
               const isSelected = selectedStackId === stack.id;
 
+              const mid = (arr.length - 1) / 2;
+              const arcOffset = -Math.abs(index - mid) * 6;
+
+              const clampFn = createSafeZoneClamper({
+                layout: '3P',
+                handPosition: 'bottom-center',
+                slotIndex: index,
+                totalSlots: arr.length,
+                cardWidth: 110,
+              });
+
               return (
-                <CardStack
+                <div
                   key={stack.id}
-                  stack={stack}
-                  isSelectable={isSelectable}
-                  isSelected={isSelected}
-                  onSelect={handleConfirmUpgrade}
-                  onInspectCard={onInspectCard}
-                  scale={1.0}
-                />
+                  style={{
+                    transform: stackPositions[stack.id] ? undefined : `translateY(${arcOffset}px)`,
+                    transition: 'transform 0.2s ease',
+                  }}
+                >
+                  <CardStack
+                    stack={stack}
+                    isSelectable={isSelectable}
+                    isSelected={isSelected}
+                    onSelect={handleConfirmUpgrade}
+                    onInspectCard={onInspectCard}
+                    scale={1.0}
+                    isDraggable={true}
+                    position={stackPositions[stack.id]}
+                    onPositionChange={(pos) => updateStackPosition(stack.id, pos)}
+                    onDragChange={setIsCardDragging}
+                    clampPosition={clampFn}
+                  />
+                </div>
               );
             })}
           </div>
@@ -351,6 +414,25 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           </div>
         </div>
       </GameMat>
+
+      {/* Sürükleme Sırasında Görsel Yasak Bölge (Hand Zone) Göstergesi */}
+      {isCardDragging && (
+        <div
+          style={{
+            width: `${HAND_ZONE_CONFIG.CENTER_WIDTH}px`,
+            height: `${HAND_ZONE_CONFIG.HEIGHT}px`,
+          }}
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-2xl border-2 border-dashed border-red-500/80 bg-red-950/40 backdrop-blur-xs flex flex-col items-center justify-start pt-3 pointer-events-none z-30 transition-all animate-pulse"
+        >
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-950/95 border border-red-500/70 shadow-lg text-red-200 text-xs font-bold">
+            <Ban size={14} className="text-red-400" />
+            <span>Yasak Bölge (El Kartları) • Buraya Kart Konamaz</span>
+          </div>
+          <span className="text-[10px] text-red-300/80 mt-1">
+            Masa kartları elinizin üstündeki güvenli bölgeye otomatik yaslanır
+          </span>
+        </div>
+      )}
 
       {/* 3. ALT YÜZEN (FLOATING) MINIMAL AKSİYON BARI */}
       <footer className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-2xl px-5 py-2.5 shadow-2xl flex items-center justify-between">
