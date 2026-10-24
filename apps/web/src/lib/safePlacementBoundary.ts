@@ -33,25 +33,27 @@ export interface ViewportBoundaryOptions {
   viewportHeight?: number;
   margin?: number;
   topMargin?: number;
+  minScreenX?: number;
+  maxScreenX?: number;
+  minScreenY?: number;
+  maxScreenY?: number;
 }
 
-/** El kartlarının kapladığı yasak alt bölgenin yaklaşık piksel değerleri (Daraltılmış Çerçeve) */
+/** El kartlarının kapladığı yasak alt bölgenin yaklaşık piksel değerleri */
 export const HAND_ZONE_CONFIG = {
-  /** Ekranın altından itibaren yasak bölge yüksekliği */
   HEIGHT: 190,
-  /** 3P için yatayda el yelpazesinin kapladığı daraltılmış merkez genişlik */
   CENTER_WIDTH: 360,
-  /** 4P için sağ köşede el yelpazesinin kapladığı genişlik */
   RIGHT_WIDTH: 320,
-  /** Kartın güvenli sınırda oturacağı minimum emniyet mesafesi */
   SAFE_CLEARANCE: 195,
 };
 
 /**
- * Kartın sürükleme esnasında ekran sınırlarından (viewport) dışarı taşmasını engeller:
- * - Sol ve sağ sınırlarda: window.innerWidth - 12px (ve sol >= 12px)
- * - Alt sınırda: window.innerHeight - 12px
- * - Üst sınırda: top >= 50px
+ * Kartın sürükleme esnasında ekran sınırlarından (viewport) ve
+ * kullanıcının kırmızı dikdörtgen ile belirttiği geniş serbest alandan dışarı taşmasını engeller:
+ * - Sol sınır: Masanın ortasındaki butonların hemen sağı (veya minScreenX)
+ * - Sağ sınır: window.innerWidth - 12px
+ * - Üst sınır: Orta bina dizisi tepsisinin altı (veya topMargin)
+ * - Alt sınır: window.innerHeight - 12px
  */
 export function clampPositionToViewport(
   pos: CardPosition,
@@ -70,15 +72,20 @@ export function clampPositionToViewport(
   }
 
   const margin = options?.margin ?? 12;
-  const topMargin = options?.topMargin ?? 50;
+
+  // Geniş kırmızı alan sınırları (Kullanıcının işaretlediği alan):
+  // 1. Sol: Masanın merkez aksiyon butonlarının hemen sağı
+  const defaultMinX = Math.max(margin, Math.round(winW * 0.46));
+  const minScreenX = options?.minScreenX ?? defaultMinX;
+  const maxScreenX = options?.maxScreenX ?? (winW - margin);
+
+  // 2. Üst: Orta bina sırasının hemen altı
+  const defaultMinY = Math.max(options?.topMargin ?? 50, Math.round(winH * 0.50) + 15);
+  const minScreenY = options?.minScreenY ?? defaultMinY;
+  const maxScreenY = options?.maxScreenY ?? (winH - margin);
 
   let clampedX = pos.x;
   let clampedY = pos.y;
-
-  const minScreenX = margin;
-  const maxScreenX = winW - margin;
-  const minScreenY = topMargin;
-  const maxScreenY = winH - margin;
 
   const minAllowedX = minScreenX - baseRect.left;
   const maxAllowedX = maxScreenX - baseRect.left - baseRect.width;
@@ -102,13 +109,12 @@ export function clampPositionToViewport(
 
 /**
  * Kullanıcı masadaki bir kartı sürüklerken veya bırakırken,
- * kartın masa ve tarayıcı ekranı dışına taşmasını engelleyen ve güvenli bölgenin sınırına yaslayan (clamp)
+ * kartın masa ve tarayıcı ekranı dışına taşmasını engelleyen ve geniş güvenli bölgenin sınırına yaslayan (clamp)
  * koordinat sınırlandırıcı.
  *
- * Sıkı sınırlar:
- * - 4P (sağ alt oyuncu masası): minX = -140, maxX = 40, minY = -100, maxY = 30
- * - 3P (alt merkez oyuncu masası): minX = -120, maxX = 120, minY = -100, maxY = 30
- * - window.innerWidth ve window.innerHeight sınırları (12px pay)
+ * Geniş sınırlar:
+ * Kartlar kullanıcının işaretlediği geniş kırmızı alanda (aksiyon butonlarının sağından ekran sağına,
+ * market sırasının altından ekran altına kadar) serbestçe sürüklenebilir ve birbiri üstüne konabilir.
  */
 export function createSafeZoneClamper(config: SafeBoundaryConfig) {
   const {
@@ -120,33 +126,21 @@ export function createSafeZoneClamper(config: SafeBoundaryConfig) {
   return function clampPosition(pos: CardPosition): CardPosition {
     const { x, y } = pos;
 
-    // Kullanıcının kırmızı dikdörtgen ile belirlediği serbest sürükleme sınırları:
-    // Sola: -140px (aksiyon butonlarına kadar)
-    // Sağa: 100px (el kartlarına kadar)
-    // Yukarı: -75px (market sırasına kadar)
-    // Aşağı: 45px (ekran altına kadar)
-    let minX = -140;
-    let maxX = 100;
-    let minY = -75;
-    let maxY = 45;
-
     const winW =
       viewportWidth ??
-      (typeof window !== 'undefined' ? window.innerWidth : undefined);
+      (typeof window !== 'undefined' ? window.innerWidth : 1280);
     const winH =
       viewportHeight ??
-      (typeof window !== 'undefined' ? window.innerHeight : undefined);
+      (typeof window !== 'undefined' ? window.innerHeight : 720);
 
-    if (winW !== undefined && winH !== undefined) {
-      // 12px emniyet payı ile ekran sınırlarını aşmayacak dinamik daraltma
-      const maxAllowedX = Math.max(10, Math.floor((winW - margin * 2) / 4));
-      const maxAllowedY = Math.max(10, Math.floor((winH - margin * 2) / 6));
+    // Geniş hareket alanı: kartlar onlarca kart biriktiğinde bile her yöne serbestçe hareket edebilir
+    const maxSpanX = Math.max(400, Math.round(winW * 0.65));
+    const maxSpanY = Math.max(250, Math.round(winH * 0.50));
 
-      minX = Math.max(minX, -maxAllowedX);
-      maxX = Math.min(maxX, maxAllowedX);
-      minY = Math.max(minY, -maxAllowedY);
-      maxY = Math.min(maxY, maxAllowedY);
-    }
+    const minX = -maxSpanX;
+    const maxX = maxSpanX;
+    const minY = -maxSpanY;
+    const maxY = maxSpanY;
 
     const clampedX = Math.max(minX, Math.min(maxX, x));
     const clampedY = Math.max(minY, Math.min(maxY, y));

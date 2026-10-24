@@ -43,7 +43,7 @@ export const PlayerNameplate: React.FC<PlayerNameplateProps> = ({
 
       {/* Ana İsim Plakası */}
       <div
-        className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-300 ${
+        className={`relative flex items-center gap-1.5 sm:gap-2 px-2 py-0.5 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl transition-all duration-300 ${
           isTurn
             ? 'bg-gradient-to-r from-sky-950/95 via-sky-900/90 to-sky-950/95 border-2 border-sky-400 animate-blue-aura shadow-[0_0_20px_rgba(56,189,248,0.7)]'
             : 'bg-black/65 backdrop-blur-md border border-white/10 shadow-lg hover:border-white/20'
@@ -51,23 +51,25 @@ export const PlayerNameplate: React.FC<PlayerNameplateProps> = ({
       >
         {/* Aktif Sıra Yanıp Sönen Mavi Sinyal Işığı */}
         {isTurn && (
-          <span className="relative flex h-2.5 w-2.5 flex-shrink-0" title="Sıra Bu Oyuncuda">
+          <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5 flex-shrink-0" title="Sıra Bu Oyuncuda">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-80" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-300 shadow-[0_0_8px_#38bdf8]" />
+            <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-sky-300 shadow-[0_0_8px_#38bdf8]" />
           </span>
         )}
 
         {/* Büyütülmüş Oyuncu İsmi & Mavi Yanıp Sönme */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <span
             className={`font-black tracking-wide transition-all ${
               isTurn
-                ? 'text-base sm:text-lg text-sky-300 drop-shadow-[0_0_12px_rgba(56,189,248,0.95)] animate-blue-pulse-glow'
-                : 'text-sm sm:text-base text-slate-200'
+                ? 'text-xs sm:text-lg text-sky-300 drop-shadow-[0_0_12px_rgba(56,189,248,0.95)] animate-blue-pulse-glow'
+                : 'text-xs sm:text-base text-slate-200'
             }`}
           >
             {name}
-            {isMe && <span className="text-[11px] font-bold text-sky-400/80 ml-1">(Sen)</span>}
+            {isMe && !name.toLowerCase().includes('sen') && (
+              <span className="text-[11px] font-bold text-sky-400/80 ml-1">(Sen)</span>
+            )}
           </span>
 
           {/* Sıra Bildirim Rozeti */}

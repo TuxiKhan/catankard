@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { Resource, ResourceCounts } from '@catankard/engine';
 import { getResourceImageUrl } from '../lib/cardImages.ts';
 import { assetUrl } from '../lib/assetUrl.ts';
@@ -161,33 +161,63 @@ export const FannedHand: React.FC<FannedHandProps> = ({
   const mid = (totalCards - 1) / 2;
 
   // Yelpaze aralıkları: Kartların birbirinin üzerine doğal ve homojen şekilde binmesi
-  const maxHandSpan = (compact ? 260 : 420) * scale;
+  const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const isSmallScreen = winWidth < 768;
+  const isMobileLandscape = winHeight <= 520 && winWidth >= 500;
+
+  // İki sıralı dizilim kontrolü (Elde 6 veya daha fazla kart olduğunda iki sıra basamaklı yerleşim)
+  const isTwoRow = isBottomFan && !isOpponentHand && totalCards >= 6;
+  const topCount = isTwoRow ? Math.ceil(totalCards / 2) : totalCards;
+  const bottomCount = isTwoRow ? totalCards - topCount : 0;
+  const maxInRow = isTwoRow ? topCount : totalCards;
+
+  const effectiveBaseSpan = isSmallScreen
+    ? Math.min(140, winWidth * 0.36)
+    : isMobileLandscape
+    ? 170
+    : compact
+    ? 240
+    : 380;
+  const maxHandSpan = effectiveBaseSpan * (isSmallScreen ? 1 : scale);
+  const maxCardStep = (isSmallScreen ? 14 : compact ? 22 : 36) * scale;
   const bottomFanOverlapSpacing =
     totalCards <= 1
       ? 0
-      : Math.min((compact ? 22 : 36) * scale, maxHandSpan / Math.max(1, totalCards - 1));
+      : Math.min(maxCardStep, maxHandSpan / Math.max(1, totalCards - 1));
+
+  const twoRowYOffset = Math.round((compact ? 24 : 32) * scale);
+  const rowOverlapSpacing =
+    maxInRow <= 1
+      ? 0
+      : Math.min((isSmallScreen ? 18 : compact ? 24 : 36) * scale, maxHandSpan / Math.max(1, maxInRow - 1));
 
   // Köşelerdeki rakip yelpazeleri için referans görseldeki gibi sıkışık, doğal kavisli örtüşme
-  const maxCornerFanSpan = (compact ? 130 : 180) * scale;
+  const maxCornerFanSpan = (isSmallScreen ? 90 : compact ? 130 : 180) * scale;
   const opponentOverlapSpacing =
     totalCards <= 1
       ? 0
-      : Math.min((compact ? 15 : 20) * scale, maxCornerFanSpan / Math.max(1, totalCards - 1));
+      : Math.min((isSmallScreen ? 10 : compact ? 15 : 20) * scale, maxCornerFanSpan / Math.max(1, totalCards - 1));
 
   // Konteyner boyutları
   let containerWidth: number;
   let containerHeight: number;
 
   if (isBottomFan) {
-    containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + 48);
-    containerHeight = Math.round(cardH + (compact ? 28 : 50) * scale);
+    if (isTwoRow) {
+      containerWidth = Math.round(cardW + (maxInRow - 1) * rowOverlapSpacing + (isSmallScreen ? 16 : 36));
+      containerHeight = Math.round(cardH + twoRowYOffset + (compact || isSmallScreen ? 14 : 36) * scale);
+    } else {
+      containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + (isSmallScreen ? 16 : 36));
+      containerHeight = Math.round(cardH + (compact || isSmallScreen ? 20 : 50) * scale);
+    }
   } else if (isCornerArc) {
-    const arcExtraW = totalCards > 1 ? (compact ? 26 : 38) * scale : 8;
-    containerWidth = Math.round(cardW + (totalCards - 1) * opponentOverlapSpacing + arcExtraW + 16);
-    containerHeight = Math.round(cardH + (compact ? 20 : 32) * scale + 16);
+    const arcExtraW = totalCards > 1 ? (compact || isSmallScreen ? 16 : 38) * scale : 6;
+    containerWidth = Math.round(cardW + (totalCards - 1) * opponentOverlapSpacing + arcExtraW + (isSmallScreen ? 8 : 16));
+    containerHeight = Math.round(cardH + (compact || isSmallScreen ? 14 : 32) * scale + 12);
   } else {
-    containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + 48);
-    containerHeight = Math.round(cardH + (compact ? 28 : 50) * scale);
+    containerWidth = Math.round(cardW + (totalCards - 1) * bottomFanOverlapSpacing + (isSmallScreen ? 16 : 36));
+    containerHeight = Math.round(cardH + (compact || isSmallScreen ? 20 : 50) * scale);
   }
 
   // Hizalama konteyner sınıfları (Sadece align açıkça belirtildiyse fixed konumu kullan)
@@ -211,6 +241,46 @@ export const FannedHand: React.FC<FannedHandProps> = ({
   const handleMouseLeave = () => {
     setHoveredIndex(null);
     onCardHover?.(null, null);
+  };
+
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef<boolean>(false);
+  const pointerStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handlePointerDownCard = (res: Resource | null, index: number, e: React.PointerEvent) => {
+    if (disabled || !res) return;
+    setHoveredIndex(index);
+    longPressFiredRef.current = false;
+    pointerStartPosRef.current = { x: e.clientX, y: e.clientY };
+
+    if (onInspectCard) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressFiredRef.current = true;
+        try {
+          navigator.vibrate?.(40);
+        } catch {}
+        onInspectCard(res);
+      }, 400);
+    }
+  };
+
+  const handlePointerMoveCard = (e: React.PointerEvent) => {
+    if (pointerStartPosRef.current && longPressTimerRef.current) {
+      const dx = e.clientX - pointerStartPosRef.current.x;
+      const dy = e.clientY - pointerStartPosRef.current.y;
+      if (Math.hypot(dx, dy) > 8) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+
+  const handlePointerUpCard = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   };
 
   return (
@@ -317,33 +387,66 @@ export const FannedHand: React.FC<FannedHandProps> = ({
             // Aktif oyuncu eli: bottom-center (3P) ve bottom-right (4P) modlarında
             // homojen, akıcı, zıplama olmadan kusursuz gezinme deneyimi
             transformOrigin = 'bottom center';
-            const maxSpread = compact ? 20 : 28;
-            const angleStep =
-              totalCards <= 1
-                ? 0
-                : Math.min(compact ? 4.5 : 5.5, maxSpread / Math.max(1, totalCards - 1));
-            baseRotation = (i - mid) * angleStep;
 
-            const arcStep = (compact ? 2.5 : 4) * scale;
-            const arcY = Math.abs(i - mid) * arcStep;
+            if (isTwoRow) {
+              const isTopRow = i < topCount;
+              const rowPos = isTopRow ? i : i - topCount;
+              const countInRow = isTopRow ? topCount : bottomCount;
+              const rowMid = (countInRow - 1) / 2;
 
-            translateX = (i - mid) * bottomFanOverlapSpacing;
-            translateY = arcY;
+              const angleStep = Math.min(compact ? 3.5 : 4.5, 22 / Math.max(1, countInRow - 1));
+              baseRotation = (rowPos - rowMid) * angleStep;
 
-            if (isHovered && !isOpponentHand) {
-              translateY -= compact ? 18 : 26;
-              currentScale = 1.08;
-              zIndex = 50;
-            } else if (isSelected) {
-              translateY -= compact ? 12 : 16;
-              zIndex = 40;
+              const arcStep = (compact ? 2 : 2.5) * scale;
+              const arcY = Math.abs(rowPos - rowMid) * arcStep;
+
+              translateX = (rowPos - rowMid) * rowOverlapSpacing;
+              translateY = (isTopRow ? -twoRowYOffset : 0) + arcY;
+              zIndex = isTopRow ? (i + 1) : (20 + (i - topCount) + 1);
+
+              if (isHovered && !isOpponentHand) {
+                translateY -= compact ? 18 : 26;
+                currentScale = 1.1;
+                zIndex = 100;
+              } else if (isSelected) {
+                translateY -= compact ? 12 : 16;
+                zIndex = 80;
+              }
+
+              cardPositionStyle = {
+                bottom: '8px',
+                left: '50%',
+                marginLeft: `-${cardW / 2}px`,
+              };
+            } else {
+              const maxSpread = compact ? 20 : 28;
+              const angleStep =
+                totalCards <= 1
+                  ? 0
+                  : Math.min(compact ? 4.5 : 5.5, maxSpread / Math.max(1, totalCards - 1));
+              baseRotation = (i - mid) * angleStep;
+
+              const arcStep = (compact ? 2.5 : 4) * scale;
+              const arcY = Math.abs(i - mid) * arcStep;
+
+              translateX = (i - mid) * bottomFanOverlapSpacing;
+              translateY = arcY;
+
+              if (isHovered && !isOpponentHand) {
+                translateY -= compact ? 18 : 26;
+                currentScale = 1.08;
+                zIndex = 50;
+              } else if (isSelected) {
+                translateY -= compact ? 12 : 16;
+                zIndex = 40;
+              }
+
+              cardPositionStyle = {
+                bottom: '8px',
+                left: '50%',
+                marginLeft: `-${cardW / 2}px`,
+              };
             }
-
-            cardPositionStyle = {
-              bottom: '8px',
-              left: '50%',
-              marginLeft: `-${cardW / 2}px`,
-            };
           }
 
           // Kart arkası görseli
@@ -356,10 +459,18 @@ export const FannedHand: React.FC<FannedHandProps> = ({
               key={`${res ?? 'card'}-${i}`}
               onClick={() => {
                 if (disabled) return;
+                if (longPressFiredRef.current) return;
                 if (res && onCardClick) {
                   onCardClick(res, i);
+                } else if (res && onInspectCard) {
+                  // Normal oyunda karta dokunulduğunda doğrudan kart detayını aç
+                  onInspectCard(res);
                 }
               }}
+              onPointerDown={(e) => handlePointerDownCard(res, i, e)}
+              onPointerMove={handlePointerMoveCard}
+              onPointerUp={handlePointerUpCard}
+              onPointerCancel={handlePointerUpCard}
               onContextMenu={(e) => {
                 if (res && onInspectCard) {
                   e.preventDefault();
@@ -383,7 +494,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
                 transition:
                   'transform 0.18s cubic-bezier(0.2, 0.8, 0.35, 1), box-shadow 0.18s ease',
               }}
-              className={`absolute cursor-pointer rounded-xl overflow-hidden group ${
+              className={`absolute cursor-pointer rounded-xl overflow-hidden group select-none ${
                 isHovered
                   ? 'shadow-2xl shadow-black/80 ring-2 ring-amber-400'
                   : isSelected
@@ -417,7 +528,7 @@ export const FannedHand: React.FC<FannedHandProps> = ({
               ) : (
                 /* AKTİF OYUNCU KARTI - AÇIK KAYNAK (Üzerinde metin yok, saf kart görseli) */
                 <div
-                  className={`relative w-full h-full rounded-xl overflow-hidden border-2 bg-slate-900 transition-colors ${
+                  className={`relative w-full h-full rounded-xl overflow-hidden border-2 bg-slate-900 transition-colors pointer-events-none ${
                     meta ? meta.border : 'border-amber-600'
                   }`}
                 >

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, ArrowRightLeft } from 'lucide-react';
 import type { PlayerView, Resource, ResourceCounts } from '@catankard/engine';
 import { getResourceImageUrl } from '../lib/cardImages.ts';
@@ -19,6 +19,123 @@ const RES_NAMES: Record<Resource, string> = {
   wool: 'Yün',
   wheat: 'Buğday',
   ore: 'Demir',
+};
+
+interface TradeCardSlotProps {
+  resource: Resource;
+  count: number;
+  maxAvailable?: number;
+  mode: 'give' | 'want';
+  onAdd: () => void;
+  onSubtract: () => void;
+  onReset: () => void;
+}
+
+const TradeCardSlot: React.FC<TradeCardSlotProps> = ({
+  resource,
+  count,
+  maxAvailable,
+  mode,
+  onAdd,
+  onSubtract,
+  onReset,
+}) => {
+  const isSelected = count > 0;
+  const isGive = mode === 'give';
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef<boolean>(false);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    longPressFiredRef.current = false;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      try {
+        navigator.vibrate?.(40);
+      } catch {}
+      onReset();
+    }, 400);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (pointerStartRef.current && longPressTimerRef.current) {
+      const dx = e.clientX - pointerStartRef.current.x;
+      const dy = e.clientY - pointerStartRef.current.y;
+      if (Math.hypot(dx, dy) > 8) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (longPressFiredRef.current) {
+      e.stopPropagation();
+      return;
+    }
+    if (maxAvailable !== undefined && count >= maxAvailable) return;
+    onAdd();
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onSubtract();
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
+        isSelected
+          ? isGive
+            ? 'ring-4 ring-emerald-400 scale-105 shadow-2xl shadow-emerald-500/30 -translate-y-1'
+            : 'ring-4 ring-amber-400 scale-105 shadow-2xl shadow-amber-500/30 -translate-y-1'
+          : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
+      }`}
+      style={{ width: '96px', height: '140px' }}
+      title={`${RES_NAMES[resource]} - Dokun: +1 | Uzun Bas: Sıfırla | Sağ Tık: -1`}
+    >
+      <img
+        src={getResourceImageUrl(resource)}
+        alt={RES_NAMES[resource]}
+        className="w-full h-full object-cover pointer-events-none"
+        draggable={false}
+      />
+
+      {/* Kartın Üstünde Çarpan Rozeti */}
+      {isSelected && (
+        <div
+          className={`absolute top-2 right-2 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-xl border-2 animate-in zoom-in-75 ${
+            isGive ? 'bg-emerald-500 border-emerald-200' : 'bg-amber-500 border-amber-200'
+          }`}
+        >
+          x{count}
+        </div>
+      )}
+
+      {/* Eldeki Toplam Stok Bilgisi (Sadece 'give' modunda) */}
+      {isGive && maxAvailable !== undefined && (
+        <div className="absolute bottom-1.5 inset-x-1.5 bg-black/80 text-emerald-300 text-[10px] font-bold py-0.5 text-center rounded pointer-events-none">
+          Eldeki: {maxAvailable}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const TradeModal: React.FC<TradeModalProps> = ({
@@ -170,57 +287,24 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     Vereceğin (Elinden)
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    Sol Tık: +1 | Sağ Tık: -1
+                    Dokun: +1 | Uzun Bas: Sıfırla
                   </span>
                 </div>
 
                 {availableResources.length > 0 ? (
                   <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-emerald-900/40">
-                    {availableResources.map((r) => {
-                      const maxAvail = view.yourHand[r] || 0;
-                      const count = give[r] || 0;
-                      const isSelected = count > 0;
-
-                      return (
-                        <div
-                          key={`give-${r}`}
-                          onClick={() => {
-                            if (count < maxAvail) {
-                              setGive((prev) => ({ ...prev, [r]: count + 1 }));
-                            }
-                          }}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setGive((prev) => ({ ...prev, [r]: Math.max(0, count - 1) }));
-                          }}
-                          className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
-                            isSelected
-                              ? 'ring-4 ring-emerald-400 scale-105 shadow-2xl shadow-emerald-500/30 -translate-y-1'
-                              : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
-                          }`}
-                          style={{ width: '96px', height: '140px' }}
-                        >
-                          <img
-                            src={getResourceImageUrl(r)}
-                            alt={RES_NAMES[r]}
-                            className="w-full h-full object-cover pointer-events-none"
-                            draggable={false}
-                          />
-
-                          {/* Kartın Üstünde Çarpan Rozeti (Her kart eklendiğinde üzerinde xN rozeti) */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-xl border-2 border-emerald-200 animate-in zoom-in-75">
-                              x{count}
-                            </div>
-                          )}
-
-                          {/* Eldeki Toplam Stok Bilgisi */}
-                          <div className="absolute bottom-1.5 inset-x-1.5 bg-black/80 text-emerald-300 text-[10px] font-bold py-0.5 text-center rounded pointer-events-none">
-                            Eldeki: {maxAvail}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {availableResources.map((r) => (
+                      <TradeCardSlot
+                        key={`give-${r}`}
+                        resource={r}
+                        count={give[r] || 0}
+                        maxAvailable={view.yourHand[r] || 0}
+                        mode="give"
+                        onAdd={() => setGive((prev) => ({ ...prev, [r]: (prev[r] || 0) + 1 }))}
+                        onSubtract={() => setGive((prev) => ({ ...prev, [r]: Math.max(0, (prev[r] || 0) - 1) }))}
+                        onReset={() => setGive((prev) => ({ ...prev, [r]: 0 }))}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center p-8 rounded-2xl bg-black/30 border border-emerald-900/30 text-xs text-slate-400">
@@ -236,48 +320,22 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     İstediğin
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    Sol Tık: +1 | Sağ Tık: -1
+                    Dokun: +1 | Uzun Bas: Sıfırla
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-amber-900/40">
-                  {RESOURCES.map((r) => {
-                    const count = want[r] || 0;
-                    const isSelected = count > 0;
-
-                    return (
-                      <div
-                        key={`want-${r}`}
-                        onClick={() => {
-                          setWant((prev) => ({ ...prev, [r]: (prev[r] || 0) + 1 }));
-                        }}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setWant((prev) => ({ ...prev, [r]: Math.max(0, (prev[r] || 0) - 1) }));
-                        }}
-                        className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
-                          isSelected
-                            ? 'ring-4 ring-amber-400 scale-105 shadow-2xl shadow-amber-500/30 -translate-y-1'
-                            : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
-                        }`}
-                        style={{ width: '96px', height: '140px' }}
-                      >
-                        <img
-                          src={getResourceImageUrl(r)}
-                          alt={RES_NAMES[r]}
-                          className="w-full h-full object-cover pointer-events-none"
-                          draggable={false}
-                        />
-
-                        {/* Kartın Üstünde Çarpan Rozeti */}
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-xl border-2 border-amber-200 animate-in zoom-in-75">
-                            x{count}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {RESOURCES.map((r) => (
+                    <TradeCardSlot
+                      key={`want-${r}`}
+                      resource={r}
+                      count={want[r] || 0}
+                      mode="want"
+                      onAdd={() => setWant((prev) => ({ ...prev, [r]: (prev[r] || 0) + 1 }))}
+                      onSubtract={() => setWant((prev) => ({ ...prev, [r]: Math.max(0, (prev[r] || 0) - 1) }))}
+                      onReset={() => setWant((prev) => ({ ...prev, [r]: 0 }))}
+                    />
+                  ))}
                 </div>
               </div>
             </div>

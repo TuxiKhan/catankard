@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { BuildingCard, BuildingType, PlayerId, PlayerView, Resource } from '@catankard/engine';
 import {
   type FlyingCard,
@@ -495,6 +495,7 @@ export interface ReplenishCardSlotProps {
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onDoubleClick?: (e: React.MouseEvent) => void;
+  onInspect?: () => void;
 }
 
 export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
@@ -507,7 +508,45 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
   onClick,
   onContextMenu,
   onDoubleClick,
+  onInspect,
 }) => {
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef<boolean>(false);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    longPressFiredRef.current = false;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+
+    if (onInspect) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressFiredRef.current = true;
+        try {
+          navigator.vibrate?.(40);
+        } catch {}
+        onInspect();
+      }, 400);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (dragStartRef.current && longPressTimerRef.current) {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      if (Math.hypot(dx, dy) > 8) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
   if (!card) {
     return (
       <div
@@ -539,7 +578,17 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
                 transform: 'rotateY(180deg)',
               }
         }
-        onClick={onClick}
+        onClick={(e) => {
+          if (longPressFiredRef.current) {
+            e.stopPropagation();
+            return;
+          }
+          onClick?.();
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onContextMenu={onContextMenu}
         onDoubleClick={onDoubleClick}
       >

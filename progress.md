@@ -3,11 +3,73 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 14 – GitHub Pages Otomatik Dağıtım (GitHub Actions Workflow & Asset Path Uyumluluğu)
+- **Aşama:** STEP 17 – Mobil Dokunmatik Mekanikleri, Kart Detay İnceleme & Takas Sayacı İyileştirmeleri
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
 - **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1 (Edge Functions v4 deployed)
 - **Canlı Test:** `http://localhost:5173/` (Vite dev server aktif)
-- **Son güncelleme:** 2026-10-24
+- **Son güncelleme:** 2026-10-25
+
+## Mobil Dokunmatik Mekanikleri & Kart İnceleme Çözümleri (STEP 17)
+1. **Mobilde Sağ Tık Olmaması Sorununun Çözülmesi & Çok Kanallı İnceleme:**
+   - **Eldeki Kaynak Kartları ([FannedHand.tsx](file:///C:/A/kode/catankard/apps/web/src/components/FannedHand.tsx)):** Normal oyunda eldeki herhangi bir kaynak kartına dokunulduğunda doğrudan kart inceleme modalı ([CardModal.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardModal.tsx)) açılır. Ayrıca 450ms uzun basma haptik titreşim (`navigator.vibrate`) desteği ve dokunmatik `(i)` butonu eklendi.
+   - **Masadaki Kartlar ([TableCard.tsx](file:///C:/A/kode/catankard/apps/web/src/components/TableCard.tsx) & [CardStack.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardStack.tsx)):** Masada sürükleme ve yığma eylemlerini bozmadan her kartın ve yığının sağ üst köşesine dokunmatik Detay `(i)` butonu eklendi. Karta 450ms basılı tutulduğunda titreşimle detay modalı açılır. Rakip kartlarına tek tık doğrudan detay açar.
+   - **Pazar / Açık İnşaat Kartları ([BuildingRowMat.tsx](file:///C:/A/kode/catankard/apps/web/src/components/BuildingRowMat.tsx) & [CardAnimations.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardAnimations.tsx)):** Yetersiz kaynak durumunda karta tek dokunuş doğrudan kart detayını açar; yeterli kaynak varken kartı inşa etmeden önce incelemek için sağ üstteki `(i)` butonuna dokunulabilir veya 450ms basılı tutulabilir.
+   - **Büyükşehir Yığını:** Yığının sol üst köşesine eklenen dokunmatik `(i)` butonu ile 5 büyükşehir kartının yer aldığı deste tarayıcısı ([DeckBrowserModal.tsx](file:///C:/A/kode/catankard/apps/web/src/components/DeckBrowserModal.tsx)) mobilde rahatça açılır.
+2. **Takas Modalında Mobilde Dokunarak Adet Azaltma ([TradeModal.tsx](file:///C:/A/kode/catankard/apps/web/src/components/TradeModal.tsx)):**
+   - Mobilde sağ tık olmadığı için eklenen kart adedinin azaltılamaması sorunu giderildi.
+   - Seçilen her kartın sol üstüne belirgin dokunmatik kırmızı `[-]` butonu eklendi; karta dokunulduğunda +1, `[-]` butonuna dokunulduğunda -1 yapılır.
+   - Bilgi metni "Dokun: +1 | (-) Butonu: -1" olarak güncellendi.
+3. **Mobil Tarayıcı Sistem Menüsü Engellemesi ([index.css](file:///C:/A/kode/catankard/apps/web/src/index.css)):**
+   - `-webkit-touch-callout: none` ve `user-select: none` kuralları eklenerek kartlara uzun basıldığında Safari ve Chrome'un sistem görsel menüsünü açması engellendi.
+4. **Dokunmatik Kart Detay Modalı ([CardModal.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardModal.tsx)):**
+   - Sağ üst köşeye belirgin dairesel kapatma butonu (`X`) ve alt tarafa kart başlık rozeti eklendi.
+5. **Kapsamlı Test Doğrulaması:**
+   - **Playwright Mobil E2E Testi ([test_mobile_interactions.ts](file:///C:/A/kode/catankard/scratch/test_mobile_interactions.ts)):** iPhone 14 dokunmatik emülasyonunda el kartı inceleme, masa kartı `(i)` butonu, market kartı inceleme ve takas modalında `[-]` butonuyla adet düşürme adımları %100 başarıyla geçti ([mobile_inspect_hand_card.png](file:///C:/A/kode/catankard/scratch/mobile_inspect_hand_card.png), [mobile_trade_modal_stepper.png](file:///C:/A/kode/catankard/scratch/mobile_trade_modal_stepper.png)).
+   - **Masa Yığma & Z-Index Testi ([test_card_stacking.ts](file:///C:/A/kode/catankard/scratch/test_card_stacking.ts)):** Hem 3P hem 4P düzeninde %100 başarılı.
+   - **Birim Testleri (`npm test`):** 33/33 test başarılı.
+   - **Proje Derlemesi (`npm run build`):** Sıfır hata ile tamamlandı.
+
+## Yere Kart Koyma Mekaniği, Serbest Yığma & Z-Index Katman Çözümü (STEP 16)
+1. **Kartların Birbiri Üstüne Konabilmesi (Serbest Yığma / Stacking):**
+   - Masadaki dar flexbox (`max-w-md`) ve dar koordinat kısıtlamaları (`-140..100 X`, `-75..45 Y`) kaldırıldı.
+   - Konteyner genişliği `max-w-[140px] sm:max-w-xl lg:max-w-4xl flex-1` seviyesine çekildi.
+   - Kartlar masa üzerinde onlarca kart birikse bile birbirinin üzerine istenilen koordinatta serbestçe yığılabilir, çakışabilir ve taşınabilir hale getirildi.
+2. **En Son Tutulan Kart Üstte Kalsın (Dinamik Z-Index Yönetimi):**
+   - [useRealtimeCardPositions.ts](file:///C:/A/kode/catankard/apps/web/src/lib/useRealtimeCardPositions.ts) içine artımlı `cardZIndices` state'i, localStorage `${storageKey}_z` kalıcılığı ve `bringToFront(cardId)` metodu eklendi.
+   - [TableCard.tsx](file:///C:/A/kode/catankard/apps/web/src/components/TableCard.tsx) ve [CardStack.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardStack.tsx) bileşenlerine `zIndex` prop'u ve `handlePointerDown` anında tetiklenen `onBringToFront` bağlandı.
+   - Kart sürüklenirken `zIndex: 100`, bırakıldığında `zIndex: cardZIndices[cardId]` korunur. Altta kalan bir karta tekrar dokunulduğunda hemen en ön plana çıkar.
+3. **Geniş Kırmızı Dikdörtgen Alanı ve Görünmez Sınırlar:**
+   - Kullanıcının ilettiği ekran görüntüsündeki kırmızı alana birebir uyumlu olarak [safePlacementBoundary.ts](file:///C:/A/kode/catankard/apps/web/src/lib/safePlacementBoundary.ts) güncellendi:
+     - **Sol Sınır**: Merkez aksiyon butonlarının hemen sağı (`winW * 0.46`).
+     - **Sağ Sınır**: Ekranın sağ kenarı (`winW - 12px`).
+     - **Üst Sınır**: Market tepsisinin hemen altı (`winH * 0.50 + 15px`).
+     - **Alt Sınır**: Ekranın alt kenarı (`winH - 12px`).
+   - Sınırlar tamamen görünmezdir (hiçbir kesikli çizgi, etiket veya görsel çerçeve masaya çizilmez). Kartlar bu alanda sınıra ulaştığında yumuşakça durur (clamp).
+4. **Çok Oyunculu Realtime Senkronizasyon:**
+   - `CardMovePayload` içerisine `zIndex` eklendi; kart hareketleri ve katman sıralaması Supabase broadcast ile diğer oyuncuların ekranlarına da anında yansıtılır.
+   - Hem [GameDesk4P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk4P.tsx) hem [GameDesk3P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk3P.tsx) üzerinde tüm rakiplerin masadaki kartlarına `zIndex={cardZIndices[cardId]}` bağlandı.
+5. **Kapsamlı Test Doğrulaması:**
+   - **Birim Testleri (`npm test`)**: `safePlacementBoundary.test.ts` (7/7) ve `useRealtimeCardPositions.test.ts` (9/9) ile toplam 16 web birim testi ve 17 engine testi (%100) başarıyla geçti.
+   - **E2E Playwright Testi (`scratch/test_card_stacking.ts`)**: Hem 4P hem 3P modunda Yol kartı Köy kartının üzerine yığıldı, Yol kartının zIndex'i öne geçti, alttaki Köy kartına tıklandığında Köy kartının en üste çıktığı ve kartların geniş kırmızı sınırda kusursuzca clamp ettiği test edildi. Kanıt ekran görüntüleri kaydedildi (`scratch/card_stacking_verified_4p.png` ve `scratch/card_stacking_verified_3p.png`).
+   - **TypeScript & Vite Build**: `npm run build` sıfır hatayla derlendi.
+
+## Rastgelelik Motoru, Mobil UI İyileştirmeleri & E2E Testi (STEP 15)
+1. **Rastgelelik Motorunun Doğrulanması & İstatistiksel Sağlamlık:**
+   - [random.ts](file:///C:/A/kode/catankard/packages/engine/src/random.ts) Mulberry32 ve Fisher-Yates algoritmaları 1.000.000 float çekimi ve 120.000 permütasyon testiyle Chi-Kare analizine tabi tutuldu:
+     - 1M float çekimi Chi-Kare değeri: `10.90` (Kritik p=0.01 değeri `21.67`'nin çok altında, kusursuz tekdüze dağılım).
+     - 120K Fisher-Yates 3-kart permütasyon testi: `10.84` (Kritik p=0.01 değeri `15.09`'un çok altında, sıfır meyil / bias).
+     - 100K Deste Karıştırma Testi: Tuğla (+%0.08), Odun (+%0.48), Yün (-%0.96), Buğday (+%0.24), Demir (+%0.34) ile teorik olasılıklarla <%1 sapma ile tam uyumlu.
+2. **Mobilde Kartların Taşmasının & Patlamasının Giderilmesi:**
+   - [useResponsiveLayout.ts](file:///C:/A/kode/catankard/apps/web/src/lib/useResponsiveLayout.ts) hem `width` hem `height` bazlı `isMobilePortrait` ve `isMobileLandscape` modlarını ayırt edecek şekilde güncellendi; mobil dikeyde masaüstü 1.0 tam ekran ölçeğinin mobilde ekranı patlatması engellendi.
+   - [BuildingRowMat.tsx](file:///C:/A/kode/catankard/apps/web/src/components/BuildingRowMat.tsx) mobil dikeyde 2 katmanlı akıllı düzene geçirildi (üstte 4 kapalı deste + bonuslar, altta 5 açık kart yuvası); 628px'lik taşma 240px'e indirilerek telefon ekranına %100 sığdırıldı.
+   - [FannedHand.tsx](file:///C:/A/kode/catankard/apps/web/src/components/FannedHand.tsx) eldeki kaynak kartı yelpazesine ekran genişliğine duyarlı dinamik sınırlandırma (`maxHandSpan`) getirildi; 15+ kart olsa bile kartlar sıkışarak ekran dışına (x:912px) taşması önlendi.
+   - [GameDesk4P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk4P.tsx) ve [GameDesk3P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk3P.tsx) sağ alt kadranında yerdeki kartlar ile el kartları dikeyde üst üste dizilerek yatay taşma tamamen sıfırlandı (`cardsOffscreen: []`).
+   - Mobil dikeyde kullanıcıya nazik, kapatılabilir "📱 Geniş masa deneyimi için cihazınızı yatay çevirebilirsiniz" ipucu rozeti eklendi.
+3. **Gerçekçi Tarayıcı E2E Testi (`scratch/e2e_real_game_test.ts`):**
+   - Playwright ile tarayıcıda canlı maç açıldı; 4 oyuncu (Sen, Ahmet, Zeynep, Can) ve Tur #1 doğru algılandı.
+   - Marketteki uygun açık karta tıklanarak inşaat hamlesi başarıyla yapıldı.
+   - "Turu Bitir" butonuna tıklanarak sıra #2'ye geçti, Hasat fazı ve sıra dönüşü doğrulandı.
+   - Zafer koşulu ve 7 ZP "OYUN BİTTİ!" kupalı zafer ekranı test edildi; tarayıcı konsolunda 0 hata ile çalıştı.
 
 ## GitHub Pages Dağıtımı & Asset Yolu Uyumluluğu (STEP 14)
 1. **GitHub Actions Workflow Eklendi (`.github/workflows/deploy.yml`):**
@@ -151,6 +213,14 @@
 4. **Metropolis B Yetenekleri**: Şövalye/Yol başı kaynak çekme ve En Uzun Yol / En Güçlü Ordu beraberlik eşitlik kuralı (`tiebreaker`) eksiksiz uygulandı.
 5. **Olay Kartları**: Hırsız (`7 + şövalye`), Solstice (tüm olayların deste+ıskarta yeniden karıştırılması), Abundance (bonussuzlara 2 kaynak), Subsidy (açık köy başına 1 kaynak) ve Charity (en çok ZP'linin az ZP'liye kart vermesi) başarıyla modellendi.
 6. **Yol Takası**: 1 yol=4:1, 2 yol=3:1, 3 yol=2:1, 4+ yol=1:1 oranları uygulandı.
+
+## Mobil Dokunmatik Mekanikler ve Canlı Sürüm (v0.2.0)
+- [x] Kartların üzerindeki tüm suni/yardımcı butonlar (`(i)` detay butonları) kaldırıldı; kartlar tamamen saf ve temiz kart görseline kavuşturuldu.
+- [x] **Uzun Basma (Long-Press - 400ms):** Tüm kartlara (eldeliler, masadakiler, markettekiler, metropolis destesi) dokunmatik uzun basma ile detay inceleme modalı (`CardModal`) açılması sağlandı.
+- [x] **Sürükleme & Dokunma Ayrıştırması:** Masadaki kartların sürüklenmesi (drag) ile uzun basma (inspect) eşik toleransına (8px) bağlandı; parmak hareketinde uzun basma iptal edilip pürüzsüz sürükleme sağlandı.
+- [x] **Takas Menüsü (TradeModal) Sıfırlama:** Mobilde karta dokunulduğunda +1 ekleme, uzun basıldığında kaynağı 0'a sıfırlama mekanizması uygulandı. Kart üzerindeki butonlar kaldırıldı.
+- [x] **İki Sıralı Basamaklı El Yelpazesi (FannedHand):** Elde 6 veya daha fazla kart olduğunda dikey modda kartların birbirini ezmemesi için otomatik 2 sıralı basamaklı düzene geçildi; dokunulan kartın anında en öne yükselmesi (`zIndex: 100`) sağlandı.
+- [x] Masadaki kartların çift tıklama ile yuvalarına geri dönmesi korundu.
 
 ## Sonraki Adım
 Uzak Supabase projesine migration uygulama ve Edge Function deploy'u.

@@ -10,14 +10,15 @@ export interface CardMovePayload {
   playerId: string;
   cardId: string;
   pos: CardPosition;
+  zIndex?: number;
   timestamp?: number;
 }
 
 export const CARD_BOUNDS = {
-  MIN_X: -140,
-  MAX_X: 100,
-  MIN_Y: -80,
-  MAX_Y: 50,
+  MIN_X: -1200,
+  MAX_X: 1200,
+  MIN_Y: -800,
+  MAX_Y: 800,
 } as const;
 
 /**
@@ -62,6 +63,10 @@ export interface UseRealtimeCardPositionsReturn {
   positionsByPlayer: Record<string, Record<string, CardPosition>>;
   /** Aktif oyuncunun kendi kart pozisyonları: [cardId -> CardPosition] */
   positions: Record<string, CardPosition>;
+  /** Kartların masadaki z-index katman sıralaması: [cardId -> zIndex] */
+  cardZIndices: Record<string, number>;
+  /** Kartı en üst katmana (en öne) taşır */
+  bringToFront: (cardId: string) => number;
   /** Kendi kartının konumunu kaydet ve tüm oyunculara anında canlı broadcast et */
   updatePosition: (cardId: string, pos: CardPosition) => void;
   /** Sürükleme esnasında diğer oyunculara throttled akıcı konum yayını yap */
@@ -248,6 +253,45 @@ export function useRealtimeCardPositions(
   const myPositions: Record<string, CardPosition> =
     (playerId ? positionsByPlayer[playerId] : undefined) ?? {};
 
+  // Kart Z-Index Katman Sıralaması (Son tutulan/hareket ettirilen kart her zaman üstte kalır)
+  const [cardZIndices, setCardZIndices] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined' && storageKey) {
+      try {
+        const saved = localStorage.getItem(`${storageKey}_z`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      } catch {}
+    }
+    return {};
+  });
+
+  const topZRef = useRef<number>(10);
+
+  // Kartı en üst katmana (en öne) getirme fonksiyonu
+  const bringToFront = useCallback(
+    (cardId: string): number => {
+      topZRef.current = Math.max(
+        topZRef.current + 1,
+        ...Object.values(cardZIndices).filter(Number.isFinite),
+        10
+      ) + 1;
+      const nextZ = topZRef.current;
+      setCardZIndices((prev) => {
+        const updated = { ...prev, [cardId]: nextZ };
+        if (typeof window !== 'undefined' && storageKey) {
+          try {
+            localStorage.setItem(`${storageKey}_z`, JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+      return nextZ;
+    },
+    [cardZIndices, storageKey]
+  );
+
   // LocalStorage senkronizasyonu
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -318,6 +362,15 @@ export function useRealtimeCardPositions(
           [senderId]: senderMap,
         };
       });
+
+      if (typeof payload.zIndex === 'number') {
+        const incomingZ = payload.zIndex;
+        topZRef.current = Math.max(topZRef.current, incomingZ);
+        setCardZIndices((prev) => ({
+          ...prev,
+          [senderCardId]: incomingZ,
+        }));
+      }
     };
 
     channel.on('broadcast', { event: 'card_move' }, handleBroadcastMessage);
@@ -356,10 +409,12 @@ export function useRealtimeCardPositions(
       if (!channel) return;
 
       const sanitizedPos = sanitizeCardPosition(pos);
+      const currentZ = cardZIndices[cardId] || topZRef.current;
       const payload: CardMovePayload = {
         playerId,
         cardId,
         pos: sanitizedPos,
+        zIndex: currentZ,
         timestamp: Date.now(),
       };
 
@@ -452,6 +507,7 @@ export function useRealtimeCardPositions(
       if (!playerId) return;
 
       const safePos = sanitizeCardPosition(pos);
+      const newZ = bringToFront(cardId);
 
       // Bekleyen throttled yayın varsa iptal et ve son kesin pozisyonu yayınla
       if (pendingTimerRef.current[cardId]) {
@@ -539,11 +595,14 @@ export function useRealtimeCardPositions(
    */
   const resetAllPositions = useCallback(() => {
     setPositionsByPlayer({});
+    setCardZIndices({});
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem(storageKey);
+        localStorage.removeItem(`${storageKey}_z`);
         if (legacyStorageKey) {
           localStorage.removeItem(legacyStorageKey);
+          localStorage.removeItem(`${legacyStorageKey}_z`);
         }
       } catch {
         // ignore
@@ -554,6 +613,8 @@ export function useRealtimeCardPositions(
   return {
     positionsByPlayer,
     positions: myPositions,
+    cardZIndices,
+    bringToFront,
     updatePosition,
     broadcastCardPosition,
     getPosition,

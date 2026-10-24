@@ -35,6 +35,10 @@ export const App: React.FC = () => {
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [eventNotification, setEventNotification] = useState<string | null>(null);
+  const [showOrientationTip, setShowOrientationTip] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 640 && window.innerHeight > window.innerWidth;
+  });
 
   // 1. Anonim Oturum Başlatma
   useEffect(() => {
@@ -79,6 +83,11 @@ export const App: React.FC = () => {
     } else if (demo === '3p') {
       startDemoGame(3);
     }
+    const handleTriggerWin = () => {
+      setPlayerView((prev) => (prev ? { ...prev, winner: 'p1', phase: 'finished' } : null));
+    };
+    window.addEventListener('catankard_trigger_win', handleTriggerWin);
+    return () => window.removeEventListener('catankard_trigger_win', handleTriggerWin);
   }, []);
 
   // 2. Realtime Abonelikleri (Lobi & Oyun Durumu - Demo odalarında Supabase dinlenmez)
@@ -294,6 +303,24 @@ export const App: React.FC = () => {
             ✕
           </button>
         </div>
+      )}
+
+      {/* Mobil Dikey İpucu */}
+      {isGameActive && showOrientationTip && (
+        <aside
+          aria-label="Cihaz Yönlendirme İpucu"
+          className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-slate-950/90 text-amber-300 text-[11px] sm:text-xs px-3 py-1.5 rounded-full border border-amber-500/50 shadow-2xl flex items-center gap-2 backdrop-blur-md animate-in fade-in select-none pointer-events-auto"
+        >
+          <span>📱 Geniş masa deneyimi için cihazınızı yatay çevirebilirsiniz</span>
+          <button
+            type="button"
+            onClick={() => setShowOrientationTip(false)}
+            aria-label="İpucunu Kapat"
+            className="text-slate-400 hover:text-white font-bold ml-1 px-1 rounded hover:bg-white/10"
+          >
+            ✕
+          </button>
+        </aside>
       )}
 
       {!isGameActive ? (

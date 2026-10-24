@@ -93,22 +93,22 @@ describe('useRealtimeCardPositions - Helper functions & Alias resolution', () =>
   });
 
   describe('sanitizeCardPosition - Bounds clamping and coordinate sanity', () => {
-    it('clamps coordinates exceeding max and min boundaries (-140 to +100 X, -80 to +50 Y)', () => {
+    it('clamps coordinates exceeding max and min boundaries (-1200 to +1200 X, -800 to +800 Y)', () => {
       // Exceeding positive limits
-      const clampedMax = sanitizeCardPosition({ x: 999, y: 300 });
-      expect(clampedMax).toEqual({ x: 100, y: 50 });
+      const clampedMax = sanitizeCardPosition({ x: 3000, y: 1500 });
+      expect(clampedMax).toEqual({ x: 1200, y: 800 });
 
       // Exceeding negative limits
-      const clampedMin = sanitizeCardPosition({ x: -500, y: -200 });
-      expect(clampedMin).toEqual({ x: -140, y: -80 });
+      const clampedMin = sanitizeCardPosition({ x: -2000, y: -1200 });
+      expect(clampedMin).toEqual({ x: -1200, y: -800 });
 
       // Inside normal limits
-      const normal = sanitizeCardPosition({ x: 42, y: -15 });
-      expect(normal).toEqual({ x: 42, y: -15 });
+      const normal = sanitizeCardPosition({ x: 999, y: 300 });
+      expect(normal).toEqual({ x: 999, y: 300 });
 
       // Exact boundaries
-      const exact = sanitizeCardPosition({ x: -140, y: 50 });
-      expect(exact).toEqual({ x: -140, y: 50 });
+      const exact = sanitizeCardPosition({ x: -1200, y: 800 });
+      expect(exact).toEqual({ x: -1200, y: 800 });
     });
 
     it('handles invalid, non-finite, or missing coordinate values safely', () => {
