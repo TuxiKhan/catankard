@@ -7,6 +7,7 @@ import {
 } from '../lib/cardImages.ts';
 import { canAffordCard } from '../lib/canAfford.ts';
 import { DeckBrowserModal, type DeckType } from './DeckBrowserModal.tsx';
+import { TableCard } from './TableCard.tsx';
 
 export interface BuildingRowMatProps {
   view: PlayerView;
@@ -226,6 +227,35 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 4. SAĞ KENAR: KAZANILMAYI BEKLEYEN MASADAKİ BONUS KARTLAR (3 Yol & Büyük Ordu) */}
+      {(!view.longestRouteOwner || !view.largestArmyOwner) && (
+        <div className="flex items-center gap-2.5 sm:gap-3 ml-1 sm:ml-2">
+          {/* Henüz hiç kimse kazanmadıysa Masada market hizasında duran "En Uzun Yol" Kartı */}
+          {!view.longestRouteOwner && (
+            <TableCard
+              id="table-bonus-longest-route"
+              type="longest_route"
+              scale={scale}
+              baseWidth={96}
+              baseHeight={140}
+              onInspect={() => onInspectCard('longest_route')}
+            />
+          )}
+
+          {/* Henüz hiç kimse kazanmadıysa Masada market hizasında duran "En Güçlü Ordu" Kartı */}
+          {!view.largestArmyOwner && (
+            <TableCard
+              id="table-bonus-largest-army"
+              type="largest_army"
+              scale={scale}
+              baseWidth={96}
+              baseHeight={140}
+              onInspect={() => onInspectCard('largest_army')}
+            />
+          )}
+        </div>
+      )}
 
       {/* Deste Gezinme Karusel Modalı */}
       <DeckBrowserModal

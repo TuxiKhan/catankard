@@ -15,16 +15,16 @@ export interface SafeBoundaryConfig {
   cardHeight?: number;
 }
 
-/** El kartlarının kapladığı yasak alt bölgenin yaklaşık piksel değerleri */
+/** El kartlarının kapladığı yasak alt bölgenin yaklaşık piksel değerleri (Daraltılmış Çerçeve) */
 export const HAND_ZONE_CONFIG = {
   /** Ekranın altından itibaren yasak bölge yüksekliği */
-  HEIGHT: 222,
-  /** 3P için yatayda el yelpazesinin kapladığı merkez genişlik */
-  CENTER_WIDTH: 540,
+  HEIGHT: 190,
+  /** 3P için yatayda el yelpazesinin kapladığı daraltılmış merkez genişlik */
+  CENTER_WIDTH: 360,
   /** 4P için sağ köşede el yelpazesinin kapladığı genişlik */
-  RIGHT_WIDTH: 440,
+  RIGHT_WIDTH: 320,
   /** Kartın güvenli sınırda oturacağı minimum emniyet mesafesi */
-  SAFE_CLEARANCE: 228,
+  SAFE_CLEARANCE: 195,
 };
 
 /**
@@ -70,9 +70,8 @@ export function createSafeZoneClamper(config: SafeBoundaryConfig) {
       // Kart el bölgesi ile yatayda çakışıyor mu?
       inForbiddenHandZone = cardRight > handLeft && cardLeft < handRight;
     } else {
-      // 4P: Ekranın sağ alt köşesindeki ~440px el bölgesi
-      // 4P'de kullanıcı sağ alt kadranda olduğu için sağa doğru taşınan kartlar el bölgesine girer
-      inForbiddenHandZone = cardRight > -30;
+      // 4P: Ekranın sağ alt köşesindeki daraltılmış el bölgesi
+      inForbiddenHandZone = cardRight > 80;
     }
 
     // 3. Dikey Sınırlandırma (Y Clamp & Safe Snap)
@@ -81,17 +80,17 @@ export function createSafeZoneClamper(config: SafeBoundaryConfig) {
     let clampedY = y;
 
     if (inForbiddenHandZone) {
-      // YASAK BÖLGE: Kart el kartlarının kapladığı alana indirilemez!
-      // Aşağı doğru inmeye (y > 0) izin verme, hemen güvenli sınırda tut (y <= 0)
-      clampedY = Math.min(0, y);
+      // YASAK BÖLGE: Kart el kartlarının kapladığı alana fazla indirilemez,
+      // daraltılmış çerçeve uyarınca hafif payla (20px) sınırda tutulur
+      clampedY = Math.min(20, y);
     } else {
       // Serbest Bölge (Elin sağı veya solu):
-      // Kartlar el kartlarının arkasında kalmadığı için hafifçe aşağı inebilir (footer üstü)
-      clampedY = Math.min(150, y);
+      // Kartlar el kartlarının arkasında kalmadığı için rahatça aşağı inebilir
+      clampedY = Math.min(160, y);
     }
 
     // Masanın çok yukarısına (Bina Dizisi Matı veya rakiplerin üstüne) taşmayı engelle
-    clampedY = Math.max(-230, clampedY);
+    clampedY = Math.max(-280, clampedY);
 
     // 4. Yatay Sınırlandırma (X Clamp)
     // Kartın masanın tamamen dışına fırlamasını engelle

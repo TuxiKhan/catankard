@@ -287,6 +287,12 @@ export const CardStack: React.FC<CardStackProps> = ({
             (e.currentTarget as HTMLElement).style.display = 'none';
           }}
         />
+        {/* Başlangıç köyü (ilk oyuncu olmayan) için parşömen metni */}
+        {isStarting && !isStartingPlayerCard && (
+          <div className="absolute bottom-[18px] sm:bottom-[22px] inset-x-0 text-center font-bold text-stone-900 text-xs sm:text-sm tracking-wide select-none pointer-events-none">
+            İlk Köy
+          </div>
+        )}
       </div>
 
       {/* 2. KATMAN: ŞEHİR KARTI (Köyün üstüne offset px aşağı kaydırılarak biner) */}

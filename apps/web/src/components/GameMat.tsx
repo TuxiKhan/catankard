@@ -57,9 +57,6 @@ export const GameMat: React.FC<GameMatProps> = ({
           }}
         />
 
-        {/* Fiziksel Masa Dikişli Dış Kenar Şeridi (Playmat Stitched Seam) */}
-        <div className="absolute inset-2 sm:inset-3 rounded-2xl border-2 border-dashed border-white/15 pointer-events-none z-0" />
-
         {/* Masa Dokusu / Orijinal Fotoğraf Geçiş Butonu */}
         <div className="absolute top-3.5 right-4 z-30">
           <button
@@ -71,39 +68,6 @@ export const GameMat: React.FC<GameMatProps> = ({
             <ImageIcon size={12} />
             <span className="hidden sm:inline">{usePhotoBg ? 'Kadife Dokusu' : 'Masa Fotoğrafı'}</span>
           </button>
-        </div>
-
-        {/* ============================================================== */}
-        {/* EKSEN ÇİZGİLERİ (Masayı 4P için 4 eşit çeyreğe, 3P için 3 alana böler) */}
-        {/* ============================================================== */}
-        {playerCount === 4 ? (
-          /* 4 OYUNCULU EKSEN DÜZENİ (4 EŞİT ÇEYREK) */
-          <>
-            {/* Dikey Tam Eksen (Yukarıdan Aşağıya İnce Kesikli Beyaz Çizgi) */}
-            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0 border-l-2 border-dashed border-white/20 pointer-events-none z-0" />
-
-            {/* Yatay Eksen (Sol ve Sağ Kollar) */}
-            <div className="absolute top-1/2 left-0 w-[24%] border-t-2 border-dashed border-white/20 pointer-events-none z-0" />
-            <div className="absolute top-1/2 right-0 w-[24%] border-t-2 border-dashed border-white/20 pointer-events-none z-0" />
-          </>
-        ) : (
-          /* 3 OYUNCULU EKSEN DÜZENİ (3 ALAN) */
-          <>
-            {/* Üst Yarı Dikey Eksen: Sol Üst ile Sağ Üst Rakip Arasını Bölen Kesikli Çizgi */}
-            <div className="absolute top-0 bottom-1/2 left-1/2 -translate-x-1/2 w-0 border-l-2 border-dashed border-white/20 pointer-events-none z-0" />
-
-            {/* Yatay Eksen: Üst Rakipler ile Alt Masayı (Sen) Bölen Kesikli Çizgi */}
-            <div className="absolute top-1/2 left-0 right-0 border-t-2 border-dashed border-white/20 pointer-events-none z-0" />
-          </>
-        )}
-
-        {/* ============================================================== */}
-        {/* "MASA" ETİKETİ (Referans görsellerdeki masanın merkez damgası)  */}
-        {/* ============================================================== */}
-        <div className="absolute top-3.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-0 select-none">
-          <div className="px-3.5 py-0.5 rounded-full border border-white/20 bg-black/30 backdrop-blur-xs text-white/50 text-[11px] font-mono tracking-[0.25em] uppercase font-bold shadow-sm">
-            masa
-          </div>
         </div>
 
         {/* ============================================================== */}

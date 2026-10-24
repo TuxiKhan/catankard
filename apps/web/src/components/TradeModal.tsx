@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, ArrowRightLeft, Gift, Plus, Minus } from 'lucide-react';
-import type { PlayerView, Resource, ResourceCounts, TradeOffer } from '@catankard/engine';
+import { X, ArrowRightLeft } from 'lucide-react';
+import type { PlayerView, Resource, ResourceCounts } from '@catankard/engine';
 import { getResourceImageUrl } from '../lib/cardImages.ts';
 
 interface TradeModalProps {
@@ -40,19 +40,22 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const isActive = view.activePlayerId === view.you;
   const otherPlayers = Object.entries(view.players).filter(([id]) => id !== view.you);
 
+  // Sadece elinde olan kaynaklar "Vereceğin" listesinde gösterilir
+  const availableResources = RESOURCES.filter((r) => (view.yourHand[r] || 0) > 0);
+
   const handlePropose = async () => {
     setError(null);
     const giveTotal = Object.values(give).reduce((a, b) => a + b, 0);
     const wantTotal = Object.values(want).reduce((a, b) => a + b, 0);
 
     if (giveTotal === 0 || wantTotal === 0) {
-      setError('En az 1 kaynak verip 1 kaynak istemelisiniz (karşılıksız hediye yasaktır).');
+      setError('En az 1 kaynak verip 1 kaynak istemelisiniz (karşılıksız takas yapılamaz).');
       return;
     }
 
     for (const r of RESOURCES) {
       if (give[r] > 0 && want[r] > 0) {
-        setError(`Aynı kaynak (${RES_NAMES[r]}) hem verilip hem alınamaz.`);
+        setError(`Aynı kaynak (${RES_NAMES[r]}) hem teklif edilip hem istenemez.`);
         return;
       }
     }
@@ -72,34 +75,42 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const openOffers = view.tradeOffers.filter((o) => o.status === 'open');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="relative bg-slate-800 border-2 border-amber-600 rounded-2xl max-w-xl w-full p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200 select-none"
+      onClick={onClose}
+    >
+      {/* Şeffaf, hafif cam panel (Ağır dış kutudan ve sarı çift çerçeveden arındırılmış) */}
+      <div
+        className="relative bg-slate-950/95 border border-white/20 rounded-3xl max-w-4xl w-full p-5 sm:p-7 shadow-[0_25px_80px_rgba(0,0,0,0.9)] flex flex-col max-h-[92vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Kapat Butonu */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg bg-slate-700/50 hover:bg-slate-700"
+          className="absolute top-5 right-5 text-white/50 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition shadow-lg"
+          title="Kapat (ESC)"
         >
           <X size={20} />
         </button>
 
-        <div className="flex items-center gap-2 mb-4">
+        {/* Başlık */}
+        <div className="flex items-center gap-2.5 mb-3">
           <ArrowRightLeft className="text-amber-400" size={24} />
-          <h2 className="text-xl font-bold text-white">Ticaret / Takas</h2>
-        </div>
-
-        <div className="bg-amber-950/40 border border-amber-700/50 rounded-lg p-3 mb-4 text-xs text-amber-200">
-          💡 <strong>Resmi Kural:</strong> Turda 1 kez, tek bir oyuncuyla takas yapılır. Aktif oyuncuyla takas yapan <strong>diğer oyuncu</strong>, işlem sonunda desteden <strong>1 bonus kaynak kartı</strong> çeker!
+          <h2 className="text-xl font-black text-white tracking-wide">Ticaret / Takas</h2>
         </div>
 
         {error && (
-          <div className="bg-red-950/60 border border-red-500 rounded-lg p-2.5 mb-4 text-sm text-red-200">
+          <div className="bg-red-950/80 border border-red-500 text-red-200 text-xs sm:text-sm font-semibold rounded-xl px-4 py-2.5 mb-3 animate-in shake">
             {error}
           </div>
         )}
 
         {/* Açık Teklifler Bölümü */}
         {openOffers.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold uppercase text-slate-400 mb-2">Mevcut Teklifler</h3>
+          <div className="mb-5 bg-black/40 border border-white/10 rounded-2xl p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">
+              Mevcut Açık Teklifler
+            </h3>
             <div className="space-y-2">
               {openOffers.map((offer) => {
                 const isMine = offer.fromPlayerId === view.you;
@@ -109,17 +120,17 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                 return (
                   <div
                     key={offer.id}
-                    className="bg-slate-900 border border-slate-700 rounded-lg p-3 flex items-center justify-between gap-4"
+                    className="bg-slate-900/90 border border-white/10 rounded-xl p-3 flex items-center justify-between gap-4"
                   >
                     <div className="flex-1">
-                      <div className="text-xs text-amber-400 font-semibold mb-1">
+                      <div className="text-xs text-amber-300 font-bold mb-1">
                         {isMine ? 'Senin Teklifin' : `${proposerName} Teklifi`}:
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-slate-300">
-                        <span className="text-emerald-400 font-medium">Verir:</span>
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 flex-wrap">
+                        <span className="text-emerald-400 font-bold">Verir:</span>
                         {renderResourceCounts(offer.give)}
                         <span className="text-slate-500 mx-1">➔</span>
-                        <span className="text-amber-400 font-medium">İster:</span>
+                        <span className="text-amber-400 font-bold">İster:</span>
                         {renderResourceCounts(offer.want)}
                       </div>
                     </div>
@@ -128,7 +139,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                       <button
                         onClick={() => onCancelTrade(offer.id)}
                         disabled={loading}
-                        className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded text-xs font-semibold"
+                        className="px-3 py-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg text-xs font-bold transition shadow"
                       >
                         İptal Et
                       </button>
@@ -136,7 +147,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                       <button
                         onClick={() => onAcceptTrade(offer.id)}
                         disabled={loading}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold"
+                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition shadow shadow-emerald-950/60"
                       >
                         Kabul Et
                       </button>
@@ -148,109 +159,158 @@ export const TradeModal: React.FC<TradeModalProps> = ({
           </div>
         )}
 
-        {/* Yeni Teklif Oluştur */}
+        {/* Yeni Teklif Alanı */}
         {!view.turnFlags.traded ? (
           <div>
-            <h3 className="text-sm font-semibold uppercase text-slate-400 mb-3">Yeni Teklif Oluştur</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+              {/* 1. VERECEĞİN (Yalnızca Elindeki Kartlar Gözükür) */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                    Vereceğin (Elinden)
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Sol Tık: +1 | Sağ Tık: -1
+                  </span>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              {/* Vereceğin Kaynaklar */}
-              <div className="bg-slate-900/90 border border-emerald-900/60 rounded-xl p-3">
-                <span className="text-xs font-bold uppercase text-emerald-400 block mb-2">Vereceğin (Elinden)</span>
-                <div className="space-y-2">
-                  {RESOURCES.map((r) => {
-                    const available = view.yourHand[r] || 0;
-                    return (
-                      <div key={r} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <img src={getResourceImageUrl(r)} alt={r} className="w-5 h-7 object-contain" />
-                          <span className="text-xs text-slate-300">{RES_NAMES[r]} ({available})</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setGive((prev) => ({ ...prev, [r]: Math.max(0, prev[r] - 1) }))}
-                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="w-4 text-center text-xs font-bold text-white">{give[r]}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setGive((prev) => ({ ...prev, [r]: Math.min(available, prev[r] + 1) }))
+                {availableResources.length > 0 ? (
+                  <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-emerald-900/40">
+                    {availableResources.map((r) => {
+                      const maxAvail = view.yourHand[r] || 0;
+                      const count = give[r] || 0;
+                      const isSelected = count > 0;
+
+                      return (
+                        <div
+                          key={`give-${r}`}
+                          onClick={() => {
+                            if (count < maxAvail) {
+                              setGive((prev) => ({ ...prev, [r]: count + 1 }));
                             }
-                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                          >
-                            <Plus size={14} />
-                          </button>
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setGive((prev) => ({ ...prev, [r]: Math.max(0, count - 1) }));
+                          }}
+                          className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
+                            isSelected
+                              ? 'ring-4 ring-emerald-400 scale-105 shadow-2xl shadow-emerald-500/30 -translate-y-1'
+                              : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
+                          }`}
+                          style={{ width: '96px', height: '140px' }}
+                        >
+                          <img
+                            src={getResourceImageUrl(r)}
+                            alt={RES_NAMES[r]}
+                            className="w-full h-full object-cover pointer-events-none"
+                            draggable={false}
+                          />
+
+                          {/* Kartın Üstünde Çarpan Rozeti (Her kart eklendiğinde üzerinde xN rozeti) */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-xl border-2 border-emerald-200 animate-in zoom-in-75">
+                              x{count}
+                            </div>
+                          )}
+
+                          {/* Eldeki Toplam Stok Bilgisi */}
+                          <div className="absolute bottom-1.5 inset-x-1.5 bg-black/80 text-emerald-300 text-[10px] font-bold py-0.5 text-center rounded pointer-events-none">
+                            Eldeki: {maxAvail}
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center p-8 rounded-2xl bg-black/30 border border-emerald-900/30 text-xs text-slate-400">
+                    Elinizde takas edebileceğiniz kaynak kartı bulunmuyor.
+                  </div>
+                )}
+              </div>
+
+              {/* 2. İSTEDİĞİN (Tüm 5 Kaynak Kartı Gözükür) */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                    İstediğin
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Sol Tık: +1 | Sağ Tık: -1
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-amber-900/40">
+                  {RESOURCES.map((r) => {
+                    const count = want[r] || 0;
+                    const isSelected = count > 0;
+
+                    return (
+                      <div
+                        key={`want-${r}`}
+                        onClick={() => {
+                          setWant((prev) => ({ ...prev, [r]: (prev[r] || 0) + 1 }));
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setWant((prev) => ({ ...prev, [r]: Math.max(0, (prev[r] || 0) - 1) }));
+                        }}
+                        className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
+                          isSelected
+                            ? 'ring-4 ring-amber-400 scale-105 shadow-2xl shadow-amber-500/30 -translate-y-1'
+                            : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
+                        }`}
+                        style={{ width: '96px', height: '140px' }}
+                      >
+                        <img
+                          src={getResourceImageUrl(r)}
+                          alt={RES_NAMES[r]}
+                          className="w-full h-full object-cover pointer-events-none"
+                          draggable={false}
+                        />
+
+                        {/* Kartın Üstünde Çarpan Rozeti */}
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-xl border-2 border-amber-200 animate-in zoom-in-75">
+                            x{count}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
+            </div>
 
-              {/* İstediğin Kaynaklar */}
-              <div className="bg-slate-900/90 border border-amber-900/60 rounded-xl p-3">
-                <span className="text-xs font-bold uppercase text-amber-400 block mb-2">İstediğin</span>
-                <div className="space-y-2">
-                  {RESOURCES.map((r) => (
-                    <div key={r} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <img src={getResourceImageUrl(r)} alt={r} className="w-5 h-7 object-contain" />
-                        <span className="text-xs text-slate-300">{RES_NAMES[r]}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setWant((prev) => ({ ...prev, [r]: Math.max(0, prev[r] - 1) }))}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <span className="w-4 text-center text-xs font-bold text-white">{want[r]}</span>
-                        <button
-                          type="button"
-                          onClick={() => setWant((prev) => ({ ...prev, [r]: prev[r] + 1 }))}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </div>
+            {/* Hedef Oyuncu Seçimi ve Teklifi İlan Et Butonu */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-white/10">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-300">Kime:</span>
+                <select
+                  value={toPlayerId ?? ''}
+                  onChange={(e) => setToPlayerId(e.target.value ? e.target.value : null)}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 transition"
+                >
+                  <option value="">Herkese Açık Teklif</option>
+                  {otherPlayers.map(([id, p]) => (
+                    <option key={id} value={id}>
+                      {p.name}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
-            </div>
 
-            {/* Hedef Oyuncu Seçimi */}
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs text-slate-400">Kime:</span>
-              <select
-                value={toPlayerId ?? ''}
-                onChange={(e) => setToPlayerId(e.target.value ? e.target.value : null)}
-                className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+              <button
+                onClick={handlePropose}
+                disabled={loading}
+                className="w-full sm:w-auto px-8 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 active:from-amber-700 active:to-amber-600 text-slate-950 font-black rounded-xl text-sm transition shadow-xl shadow-amber-950/60 disabled:opacity-50"
               >
-                <option value="">Herkese Açık Teklif</option>
-                {otherPlayers.map(([id, p]) => (
-                  <option key={id} value={id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                {loading ? 'İletiliyor...' : 'Teklifi İlan Et'}
+              </button>
             </div>
-
-            <button
-              onClick={handlePropose}
-              disabled={loading}
-              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white font-bold rounded-lg text-sm transition shadow-lg disabled:opacity-50"
-            >
-              {loading ? 'Teklif İletiliyor...' : 'Teklifi İlan Et'}
-            </button>
           </div>
         ) : (
-          <div className="text-center text-slate-400 py-4 text-sm">
+          <div className="text-center text-slate-400 py-6 text-sm">
             Bu tur zaten bir takas yapıldı. Tur başına yalnızca 1 takasa izin verilir.
           </div>
         )}
@@ -268,3 +328,5 @@ function renderResourceCounts(counts: ResourceCounts) {
   }
   return <span>{parts.join(', ')}</span>;
 }
+
+export default TradeModal;

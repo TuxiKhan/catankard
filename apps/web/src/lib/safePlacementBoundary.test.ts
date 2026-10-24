@@ -11,12 +11,12 @@ describe('safePlacementBoundary Clamping & Hand Occlusion Prevention', () => {
       cardWidth: 110,
     });
 
-    // 1. Trying to drag card downwards into the hand zone (y > 0)
+    // 1. Trying to drag card downwards into the hand zone (y > 20)
     const resultDown = clamper({ x: 0, y: 50 });
-    expect(resultDown.y).toBe(0); // Clamped immediately to safe border (y <= 0)
+    expect(resultDown.y).toBe(20); // Clamped to narrowed safe border (y <= 20)
 
     const resultFarDown = clamper({ x: 0, y: 150 });
-    expect(resultFarDown.y).toBe(0);
+    expect(resultFarDown.y).toBe(20);
 
     // 2. Dragging card upwards into free table area (y < 0) is allowed
     const resultUp = clamper({ x: 0, y: -60 });
@@ -24,7 +24,7 @@ describe('safePlacementBoundary Clamping & Hand Occlusion Prevention', () => {
 
     // 3. Masanın çok yukarısına (Bina dizisi üstüne) taşmayı engeller
     const resultTooFarUp = clamper({ x: 0, y: -300 });
-    expect(resultTooFarUp.y).toBe(-230);
+    expect(resultTooFarUp.y).toBe(-280);
   });
 
   it('allows downward placement only on side flanks outside the hand zone', () => {
@@ -36,15 +36,15 @@ describe('safePlacementBoundary Clamping & Hand Occlusion Prevention', () => {
       cardWidth: 110,
     });
 
-    // Central hand zone width is 540px (-270 to +270).
-    // If x is far left (-350), it is outside the hand zone:
-    const resultSide = clamper({ x: -350, y: 80 });
-    expect(resultSide.x).toBe(-350);
+    // Central hand zone width is narrowed to 360px (-180 to +180).
+    // If x is far left (-300), it is outside the hand zone:
+    const resultSide = clamper({ x: -300, y: 80 });
+    expect(resultSide.x).toBe(-300);
     expect(resultSide.y).toBe(80); // Allowed because there are no hand cards on the far flank
 
-    // But if moved back horizontally towards center (-100) while y = 80:
-    const resultReturned = clamper({ x: -100, y: 80 });
-    expect(resultReturned.y).toBe(0); // Immediately snapped to safe boundary!
+    // But if moved back horizontally towards center (0) while y = 80:
+    const resultReturned = clamper({ x: 0, y: 80 });
+    expect(resultReturned.y).toBe(20); // Immediately snapped to safe boundary!
   });
 
   it('protects the bottom-right hand zone in 4P', () => {
@@ -56,9 +56,9 @@ describe('safePlacementBoundary Clamping & Hand Occlusion Prevention', () => {
       cardWidth: 100,
     });
 
-    // Dragging down into the right-hand corner is blocked
-    const resultRightDown = clamper4P({ x: 50, y: 80 });
-    expect(resultRightDown.y).toBe(0);
+    // Dragging down into the right-hand corner is clamped
+    const resultRightDown = clamper4P({ x: 120, y: 80 });
+    expect(resultRightDown.y).toBe(20);
 
     // Moving up into open quadrant table is permitted
     const resultUp = clamper4P({ x: -50, y: -50 });
