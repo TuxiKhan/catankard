@@ -764,10 +764,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           )}
 
           {/* Sağ Alt Kadran: SENİN MASAN (Sürükleme Alanı & Kaynak Kartları) */}
-          <div className={`flex ${isMobilePortrait ? 'flex-col items-end' : 'items-end justify-between'} gap-1 sm:gap-4 lg:gap-8 relative p-0.5 sm:p-1 transition-all duration-300 pb-1 w-full pl-1 sm:pl-10 lg:pl-16 pr-1 sm:pr-2`}>
-            {/* 1. Masadaki Fiziksel Kartlar (Görünmez alan, mobilde sabit düzenli, masaüstünde serbestçe sürüklenebilir) */}
-            <div className="relative z-20 flex-1 min-w-0">
-              <div className={`flex flex-wrap gap-1 sm:gap-2.5 items-end justify-start ${isMobilePortrait ? 'max-w-[190px]' : 'max-w-[140px] sm:max-w-xl lg:max-w-4xl'}`}>
+          <div className={`flex ${isMobilePortrait ? 'flex-col items-end' : 'items-end justify-end'} gap-1 sm:gap-4 lg:gap-8 relative p-0.5 sm:p-1 transition-all duration-300 pb-1 w-full pl-1 sm:pl-10 lg:pl-16 pr-1 sm:pr-2`}>
+            {/* 1. Masadaki Fiziksel Kartlar (Kendi el kartlarının hemen solunda ve bitişik) */}
+            <div className="relative z-20 flex-shrink-0">
+              <div className={`flex flex-wrap gap-1 sm:gap-2.5 items-end justify-end ${isMobilePortrait ? 'max-w-[190px]' : isMobileLandscape ? 'max-w-[340px] mr-2' : 'max-w-[140px] sm:max-w-xl lg:max-w-4xl'}`}>
               {/* Yerleşim Yığınları */}
               {youArea?.stacks.map((stack, index) => {
                 const isSettlement = stack.top === 'settlement';

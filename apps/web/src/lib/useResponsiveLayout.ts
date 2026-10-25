@@ -47,39 +47,39 @@ export function useResponsiveLayout(): ResponsiveLayoutMetrics {
   const isMobileLandscape = isMobile && !isPortrait;
   const isCompactHeight = height <= 680;
 
-  // Market (BuildingRowMat) Ölçeği (PC için dokunulmaz, mobilde oynanabilir büyük)
+  // Market (BuildingRowMat) Ölçeği (Tek sıra halinde yanlara çarpmadan rahat sığması için)
   let marketScale = 0.95;
   if (isMobilePortrait) {
     marketScale = 0.38;
   } else if (isMobileLandscape) {
-    marketScale = 0.58;
+    marketScale = 0.37;
   } else if (width <= 1024 || height <= 680) {
     marketScale = 0.68;
   }
 
-  // Rakiplerin Masadaki Kartları & Eli Ölçeği (PC için dokunulmaz)
+  // Rakiplerin Masadaki Kartları & Eli Ölçeği
   let opponentCardScale = 1.0;
   let opponentHandScale = 0.78;
   if (isMobilePortrait) {
     opponentCardScale = 0.38;
     opponentHandScale = 0.37;
   } else if (isMobileLandscape) {
-    opponentCardScale = 0.42;
-    opponentHandScale = 0.42;
+    opponentCardScale = 0.40;
+    opponentHandScale = 0.40;
   } else if (width <= 1024 || height <= 680) {
     opponentCardScale = 0.70;
     opponentHandScale = 0.60;
   }
 
-  // Oyuncunun Masadaki Kartları & Eli Ölçeği (PC için dokunulmaz, mobilde tam oynanabilir)
+  // Oyuncunun Masadaki Kartları & Eli Ölçeği
   let playerCardScale = 1.0;
   let playerHandScale = 0.95;
   if (isMobilePortrait) {
     playerCardScale = 0.43;
     playerHandScale = 0.42;
   } else if (isMobileLandscape) {
-    playerCardScale = 0.60;
-    playerHandScale = 0.62;
+    playerCardScale = 0.48;
+    playerHandScale = 0.58;
   } else if (width <= 1024 || height <= 680) {
     playerCardScale = 0.78;
     playerHandScale = 0.75;

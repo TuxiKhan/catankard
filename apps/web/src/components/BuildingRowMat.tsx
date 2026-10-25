@@ -117,9 +117,9 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   const isMobilePortrait = winWidth < 640 && winHeight > winWidth;
   const isMobileLandscape = winHeight <= 520 && winWidth >= 500;
 
-  // Kapalı desteler mobilde daha kompakt olsun, açık kartlar ise büyük ve oynanabilir kalsın
-  const isDeckCompact = isMobileLandscape || isMobilePortrait;
-  const deckScale = isDeckCompact ? scale * 0.68 : scale;
+  // Mobil yatayda da tek sıra kullanılacağı için desteleri açık kartlarla orantılı tutuyoruz
+  const isDeckCompact = isMobilePortrait;
+  const deckScale = isDeckCompact ? scale * 0.72 : scale;
   const deckW = Math.round(125 * deckScale);
   const deckH = Math.round(194 * deckScale);
   const bonusDeckW = Math.round(bonusBaseW * deckScale);
@@ -379,30 +379,11 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             </div>
           </div>
         </div>
-      ) : isMobileLandscape ? (
-        /* MOBİL YATAY (LANDSCAPE): Kenar Oyunculara Çarpmayan 2 Sıralı Büyük Kart Düzeni */
-        <div className="flex flex-col items-center justify-center select-none relative mt-2 mb-0.5 gap-1 max-w-[480px] mx-auto z-10">
-          {/* Üst Sıra: Kapalı Desteler & Bonuslar (Genişlik: ~360px) */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2">
-            {renderResourceDeck()}
-            {renderEventDeck()}
-            {renderBuildingDeck()}
-            {renderMetropolisStack()}
-            {renderBonusCards()}
-          </div>
-
-          {/* Alt Sıra: BÜYÜK VE OKUNAKLI 5 AÇIK İNŞAAT KARTI YUVASI */}
-          <div className="relative border-2 border-white/60 bg-black/40 backdrop-blur-xs shadow-2xl flex items-center justify-center rounded-xl px-2 py-1">
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              {renderOpenBuildingCards()}
-            </div>
-          </div>
-        </div>
       ) : (
-        /* PC & MASAÜSTÜ MODU: Klasik Tek Sıra */
+        /* MOBİL YATAY & PC & MASAÜSTÜ MODU: Tek Sıra Yan Yana Düzen */
         <div
           className={`flex items-center justify-center select-none relative my-0.5 sm:my-2 ${
-            isCompact ? 'gap-1.5 sm:gap-3' : 'gap-3 sm:gap-4 md:gap-6'
+            isCompact || isMobileLandscape ? 'gap-0.5 sm:gap-2' : 'gap-3 sm:gap-4 md:gap-6'
           }`}
         >
           {renderResourceDeck()}
@@ -410,14 +391,14 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           {/* ORTA: YATAY "BUILDING ROW" ALANI */}
           <div
             className={`relative border-2 border-white/60 bg-black/35 backdrop-blur-xs shadow-2xl flex flex-col items-center ${
-              isCompact
-                ? 'rounded-xl px-1.5 py-1'
+              isCompact || isMobileLandscape
+                ? 'rounded-lg px-1 py-0.5'
                 : 'rounded-2xl px-3.5 py-2.5'
             }`}
           >
             <div
               className={`flex items-center ${
-                isCompact ? 'gap-1 sm:gap-1.5' : 'gap-2 sm:gap-2.5 md:gap-3'
+                isCompact || isMobileLandscape ? 'gap-0.5 sm:gap-1.5' : 'gap-2 sm:gap-2.5 md:gap-3'
               }`}
             >
               {renderBuildingDeck()}
@@ -426,7 +407,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           </div>
 
           {/* SAĞ KENAR: Büyükşehir Destesi & Kapalı Olay Kartı Destesi */}
-          <div className={`flex items-center ${isCompact ? 'gap-1.5 sm:gap-3' : 'gap-3 sm:gap-4'}`}>
+          <div className={`flex items-center ${isCompact || isMobileLandscape ? 'gap-0.5 sm:gap-2' : 'gap-3 sm:gap-4'}`}>
             {renderMetropolisStack()}
             {renderEventDeck()}
           </div>

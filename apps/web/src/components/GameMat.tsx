@@ -152,15 +152,6 @@ export const GameMat: React.FC<GameMatProps> = ({
         className="absolute inset-0 pointer-events-none shadow-[inset_0_0_160px_rgba(0,0,0,0.85),inset_0_0_60px_rgba(0,0,0,0.5)] z-0"
       />
 
-      {/* ============================================================== */}
-      {/* "MASA" ORTA DAMGASI (Retro Catan playmat orta damgası)          */}
-      {/* ============================================================== */}
-      <div className="absolute top-3.5 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none z-0 select-none">
-        <div className="px-3.5 py-0.5 rounded-full border border-white/20 bg-black/30 backdrop-blur-xs text-white/50 text-[11px] font-mono tracking-[0.25em] uppercase font-bold shadow-sm">
-          masa
-        </div>
-      </div>
-
       {/* Masa Rengi Teması Seçici */}
       <div className="absolute top-3.5 right-4 z-40" ref={menuRef}>
         <div className="relative">
