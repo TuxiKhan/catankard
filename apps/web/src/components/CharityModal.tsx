@@ -52,27 +52,27 @@ export const CharityModal: React.FC<CharityModalProps> = ({ view, onGive }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border-2 border-emerald-600 rounded-2xl max-w-md w-full p-6 shadow-2xl text-slate-100">
-        <div className="flex items-center gap-3 text-emerald-400 mb-3">
-          <HeartHandshake size={32} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4">
+      <div className="bg-slate-900 border-2 border-emerald-600 rounded-2xl max-w-lg w-full p-3.5 sm:p-5 shadow-2xl text-slate-100 max-h-[94dvh] overflow-y-auto">
+        <div className="flex items-center gap-2.5 text-emerald-400 mb-2.5">
+          <HeartHandshake size={26} className="shrink-0" />
           <div>
-            <h2 className="text-xl font-bold">Sadaka (Charity)!</h2>
-            <p className="text-xs text-emerald-300">
+            <h2 className="text-base sm:text-lg font-bold leading-tight">Sadaka (Charity)!</h2>
+            <p className="text-[11px] text-emerald-300 leading-tight">
               En yüksek Zafer Puanına sahipsiniz! Daha az puanlı bir oyuncuya 1 kaynak vermelisiniz.
             </p>
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-900/60 border border-red-500 rounded p-2 mb-3 text-xs text-red-200">
+          <div className="bg-red-900/60 border border-red-500 rounded p-2 mb-2.5 text-xs text-red-200">
             {error}
           </div>
         )}
 
-        <div className="mb-4">
-          <label className="text-xs font-semibold text-slate-300 block mb-1.5">Kime Verilecek?</label>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="mb-2.5 sm:mb-3.5">
+          <label className="text-xs font-semibold text-slate-300 block mb-1">Kime Verilecek?</label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
             {charityDec.candidates.map((candId) => {
               const name = view.players[candId]?.name || 'Oyuncu';
               const vp = view.players[candId]?.visibleVP || 0;
@@ -83,23 +83,23 @@ export const CharityModal: React.FC<CharityModalProps> = ({ view, onGive }) => {
                   key={candId}
                   type="button"
                   onClick={() => setToPlayerId(candId)}
-                  className={`p-2.5 rounded-lg border text-left transition ${
+                  className={`px-2.5 py-1.5 sm:p-2 rounded-lg border text-left transition ${
                     isSelected
                       ? 'border-emerald-500 bg-emerald-950/50 text-white font-bold'
                       : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'
                   }`}
                 >
-                  <div className="text-sm">{name}</div>
-                  <div className="text-xs text-slate-400">{vp} Zafer Puanı</div>
+                  <div className="text-xs sm:text-sm truncate">{name}</div>
+                  <div className="text-[10px] sm:text-xs text-slate-400">{vp} Zafer Puanı</div>
                 </button>
               );
             })}
           </div>
         </div>
 
-        <div className="mb-6">
-          <label className="text-xs font-semibold text-slate-300 block mb-1.5">Hangi Kaynağı Vereceksiniz?</label>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div className="mb-3 sm:mb-4">
+          <label className="text-xs font-semibold text-slate-300 block mb-1">Hangi Kaynağı Vereceksiniz?</label>
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
             {RESOURCES.map((r) => {
               const count = view.yourHand[r] || 0;
               const isSelected = resource === r;
@@ -111,15 +111,15 @@ export const CharityModal: React.FC<CharityModalProps> = ({ view, onGive }) => {
                   type="button"
                   disabled={disabled}
                   onClick={() => setResource(r)}
-                  className={`flex flex-col items-center p-2 rounded-xl border transition ${
+                  className={`flex flex-col items-center p-1.5 sm:p-2 rounded-xl border transition ${
                     isSelected
                       ? 'border-emerald-500 bg-emerald-900/40 ring-2 ring-emerald-500'
                       : 'border-slate-700 bg-slate-800 hover:border-slate-500'
                   } ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
-                  <img src={getResourceImageUrl(r)} alt={r} className="w-8 h-12 object-contain mb-1" />
-                  <span className="text-xs font-bold">{count} adet</span>
-                  <span className="text-[10px] text-slate-400">{RES_NAMES[r]}</span>
+                  <img src={getResourceImageUrl(r)} alt={r} className="w-7 h-10 sm:w-8 sm:h-12 object-contain mb-0.5" />
+                  <span className="text-[11px] sm:text-xs font-bold">{count} adet</span>
+                  <span className="text-[9px] sm:text-[10px] text-slate-400">{RES_NAMES[r]}</span>
                 </button>
               );
             })}
@@ -129,7 +129,7 @@ export const CharityModal: React.FC<CharityModalProps> = ({ view, onGive }) => {
         <button
           onClick={handleGive}
           disabled={loading || !resource}
-          className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition disabled:opacity-50 text-sm shadow-lg"
+          className="w-full py-2.5 sm:py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition disabled:opacity-50 text-xs sm:text-sm shadow-lg"
         >
           {loading ? 'İletiliyor...' : 'Sadakayı Ver'}
         </button>

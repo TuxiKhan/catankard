@@ -100,20 +100,19 @@ const TradeCardSlot: React.FC<TradeCardSlotProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className={`relative rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
+      className={`relative w-[76px] h-[110px] lg:w-[96px] lg:h-[140px] rounded-lg lg:rounded-xl overflow-hidden cursor-pointer select-none transition-all duration-150 ${
         isSelected
           ? isGive
             ? 'ring-4 ring-emerald-400 scale-105 shadow-2xl shadow-emerald-500/30 -translate-y-1'
             : 'ring-4 ring-amber-400 scale-105 shadow-2xl shadow-amber-500/30 -translate-y-1'
           : 'opacity-85 hover:opacity-100 hover:scale-[1.02] border border-white/20'
       }`}
-      style={{ width: '96px', height: '140px' }}
       title={`${RES_NAMES[resource]} - Dokun: +1 | Uzun Bas: Sıfırla | Sağ Tık: -1`}
     >
       <img
         src={getResourceImageUrl(resource)}
         alt={RES_NAMES[resource]}
-        className="w-full h-full object-cover pointer-events-none"
+        className="w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
 
@@ -193,27 +192,27 @@ export const TradeModal: React.FC<TradeModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200 select-none"
       onClick={onClose}
     >
       {/* Şeffaf, hafif cam panel (Ağır dış kutudan ve sarı çift çerçeveden arındırılmış) */}
       <div
-        className="relative bg-slate-950/95 border border-white/20 rounded-3xl max-w-4xl w-full p-5 sm:p-7 shadow-[0_25px_80px_rgba(0,0,0,0.9)] flex flex-col max-h-[92vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/20"
+        className="relative bg-slate-950/95 border border-white/20 rounded-2xl sm:rounded-3xl max-w-4xl w-full p-3.5 sm:p-6 shadow-[0_25px_80px_rgba(0,0,0,0.9)] flex flex-col max-h-[95dvh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/20"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Kapat Butonu */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-white/50 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition shadow-lg"
+          className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 text-white/50 hover:text-white p-1.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 transition shadow-lg"
           title="Kapat (ESC)"
         >
           <X size={20} />
         </button>
 
         {/* Başlık */}
-        <div className="flex items-center gap-2.5 mb-3">
-          <ArrowRightLeft className="text-amber-400" size={24} />
-          <h2 className="text-xl font-black text-white tracking-wide">Ticaret / Takas</h2>
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <ArrowRightLeft className="text-amber-400" size={22} />
+          <h2 className="text-base sm:text-xl font-black text-white tracking-wide">Ticaret / Takas</h2>
         </div>
 
         {error && (
@@ -279,9 +278,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
         {/* Yeni Teklif Alanı */}
         {!view.turnFlags.traded ? (
           <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5 mb-3 sm:mb-5">
               {/* 1. VERECEĞİN (Yalnızca Elindeki Kartlar Gözükür) */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5 sm:gap-2">
                 <div className="flex items-center justify-between px-1">
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
                     Vereceğin (Elinden)
@@ -292,7 +291,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                 </div>
 
                 {availableResources.length > 0 ? (
-                  <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-emerald-900/40">
+                  <div className="flex flex-wrap gap-2 lg:gap-3 items-center min-h-[120px] lg:min-h-[160px] p-2 rounded-2xl bg-black/30 border border-emerald-900/40">
                     {availableResources.map((r) => (
                       <TradeCardSlot
                         key={`give-${r}`}
@@ -307,14 +306,14 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center p-8 rounded-2xl bg-black/30 border border-emerald-900/30 text-xs text-slate-400">
+                  <div className="flex items-center justify-center p-6 lg:p-8 rounded-2xl bg-black/30 border border-emerald-900/30 text-xs text-slate-400">
                     Elinizde takas edebileceğiniz kaynak kartı bulunmuyor.
                   </div>
                 )}
               </div>
 
               {/* 2. İSTEDİĞİN (Tüm 5 Kaynak Kartı Gözükür) */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5 sm:gap-2">
                 <div className="flex items-center justify-between px-1">
                   <span className="text-xs font-black uppercase tracking-wider text-amber-400">
                     İstediğin
@@ -324,7 +323,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-3 items-center min-h-[160px] p-2 rounded-2xl bg-black/30 border border-amber-900/40">
+                <div className="flex flex-wrap gap-2 lg:gap-3 items-center min-h-[120px] lg:min-h-[160px] p-2 rounded-2xl bg-black/30 border border-amber-900/40">
                   {RESOURCES.map((r) => (
                     <TradeCardSlot
                       key={`want-${r}`}

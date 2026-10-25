@@ -105,7 +105,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between items-center p-4 sm:p-8 font-sans selection:bg-amber-500 selection:text-slate-950 relative overflow-hidden">
+    <div className="h-dvh max-h-dvh bg-slate-950 text-slate-100 flex flex-col justify-between items-center p-3 sm:p-6 font-sans selection:bg-amber-500 selection:text-slate-950 relative overflow-y-auto overflow-x-hidden">
       {/* Yumuşak Catan Renk Atmosferi (Gradient Işıklar) */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-red-700/10 rounded-full blur-3xl pointer-events-none" />

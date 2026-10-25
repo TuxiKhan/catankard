@@ -310,11 +310,11 @@ export const App: React.FC = () => {
     <div className={`relative w-full h-full min-h-screen ${isGameActive ? 'overflow-hidden' : 'overflow-y-auto bg-slate-950'}`}>
       {/* Olay Bildirimi Banner'ı */}
       {eventNotification && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-2xl border-2 border-amber-300 animate-in slide-in-from-top duration-300 flex items-center gap-3 max-w-xl text-center">
-          <span className="text-sm md:text-base">{eventNotification}</span>
+        <div className="fixed top-7 lg:top-14 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-2xl border-2 border-amber-300 animate-in slide-in-from-top duration-300 flex items-center gap-2.5 max-w-xl text-center">
+          <span className="text-xs sm:text-sm md:text-base">{eventNotification}</span>
           <button
             onClick={() => setEventNotification(null)}
-            className="text-xs bg-slate-950/20 hover:bg-slate-950/40 text-slate-950 px-2 py-1 rounded-lg font-bold"
+            className="text-xs bg-slate-950/20 hover:bg-slate-950/40 text-slate-950 px-2 py-0.5 rounded-lg font-bold"
           >
             ✕
           </button>

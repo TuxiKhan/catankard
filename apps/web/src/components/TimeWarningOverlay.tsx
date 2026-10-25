@@ -85,7 +85,7 @@ export const TimeWarningOverlay: React.FC<TimeWarningOverlayProps> = ({
 
       {/* 4. Ekranın Üstünde / Ortasında Kalp Atışı Gibi Atan Geri Sayım Rozeti */}
       {showBadge && seconds !== null && seconds > 0 && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div className="absolute top-7 lg:top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div
             className={`flex items-center gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full font-black tracking-widest text-xs sm:text-sm uppercase backdrop-blur-md shadow-2xl border transition-all ${
               isCritical

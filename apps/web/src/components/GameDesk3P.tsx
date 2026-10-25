@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
-import { CardStack } from './CardStack.tsx';
+import { CardStack, groupSettlementStacks } from './CardStack.tsx';
 import { TableCard } from './TableCard.tsx';
 import { StackedTableCards } from './StackedTableCards.tsx';
 import { FannedHand } from './FannedHand.tsx';
@@ -17,6 +17,7 @@ import { TimeWarningOverlay } from './TimeWarningOverlay.tsx';
 import { TableActionButtons } from './TableActionButtons.tsx';
 import { CardAnimationOverlay, GameOpeningCinematic } from './CardAnimations.tsx';
 import { assetUrl } from '../lib/assetUrl.ts';
+import { getBuildingSubstitutionInfo, RESOURCE_NAMES_TR } from '../lib/canAfford.ts';
 import { useCardAnimations, useLogAnimationListener } from '../lib/animationHooks.ts';
 import { useRealtimeCardPositions } from '../lib/useRealtimeCardPositions.ts';
 import { createSafeZoneClamper } from '../lib/safePlacementBoundary.ts';
@@ -63,6 +64,14 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     source: 'row' | 'metropolis';
     type: 'city' | 'metropolis';
     substitution?: { replace: Resource; pay: Resource };
+  } | null>(null);
+
+  const [pendingSubstitution, setPendingSubstitution] = useState<{
+    card: BuildingCard | MetropolisCard;
+    source: 'row' | 'metropolis';
+    neededResource: Resource;
+    payOptions: Resource[];
+    ratio: number;
   } | null>(null);
 
   const {
@@ -173,24 +182,26 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     remainingSeconds <= 10 &&
     remainingSeconds > 0;
 
-  const handleSelectBuild = async (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
-    if (!isActive) return;
+  const executeBuildWithSubstitution = async (
+    card: BuildingCard | MetropolisCard,
+    source: 'row' | 'metropolis',
+    substitution?: { replace: Resource; pay: Resource }
+  ) => {
     const cardType = source === 'row' ? (card as BuildingCard).type : 'metropolis';
 
     if (cardType === 'city' || cardType === 'metropolis') {
-      // Doğrudan yükseltme moduna geç (Hiçbir popup veya "İnşa Et" butonu çıkmaz)
       setPendingUpgrade({
         cardId: card.id,
         source,
         type: cardType,
+        substitution,
       });
       return;
     }
 
-    // Yol, Şövalye, Köy: Doğrudan inşa et
     try {
       setLoading(true);
-      await onBuild(card.id, source);
+      await onBuild(card.id, source, undefined, substitution);
       spawnImpact({
         x: window.innerWidth * 0.5,
         y: window.innerHeight * 0.72,
@@ -199,6 +210,46 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectBuild = async (card: BuildingCard | MetropolisCard, source: 'row' | 'metropolis') => {
+    if (!isActive) return;
+    const cardType = source === 'row' ? (card as BuildingCard).type : 'metropolis';
+    const roadsCount = view.players[view.you]?.area?.roads ?? 1;
+    const subInfo = getBuildingSubstitutionInfo(
+      cardType,
+      view.yourHand,
+      roadsCount,
+      view.turnFlags.roadSubstitutionUsed
+    );
+
+    if (!subInfo.canAfford) return;
+
+    if (subInfo.isDirectAfford) {
+      setPendingSubstitution(null);
+      await executeBuildWithSubstitution(card, source, undefined);
+      return;
+    }
+
+    if (subInfo.neededResource && subInfo.payOptions.length === 1) {
+      setPendingSubstitution(null);
+      await executeBuildWithSubstitution(card, source, {
+        replace: subInfo.neededResource,
+        pay: subInfo.payOptions[0]!,
+      });
+      return;
+    }
+
+    if (subInfo.neededResource && subInfo.payOptions.length > 1) {
+      setPendingUpgrade(null);
+      setPendingSubstitution({
+        card,
+        source,
+        neededResource: subInfo.neededResource,
+        payOptions: subInfo.payOptions,
+        ratio: subInfo.ratio,
+      });
     }
   };
 
@@ -401,9 +452,43 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         </div>
       )}
 
+      {/* Yol İkamesi Seçim Çubuğu (Birden fazla fazla kaynak seçeneği olduğunda) */}
+      {pendingSubstitution && (
+        <div className={`fixed ${isMobile ? 'top-7' : 'top-14'} left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-amber-400/80 rounded-xl px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in fade-in`}>
+          <span className="text-[11px] sm:text-xs font-bold text-amber-200 whitespace-nowrap">
+            Yol İkamesi ({pendingSubstitution.ratio}:1) — Eksik {RESOURCE_NAMES_TR[pendingSubstitution.neededResource]} için ver:
+          </span>
+          <div className="flex items-center gap-1.5">
+            {pendingSubstitution.payOptions.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={async () => {
+                  const current = pendingSubstitution;
+                  setPendingSubstitution(null);
+                  await executeBuildWithSubstitution(current.card, current.source, {
+                    replace: current.neededResource,
+                    pay: r,
+                  });
+                }}
+                className="text-[11px] sm:text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-lg transition shadow"
+              >
+                {pendingSubstitution.ratio}× {RESOURCE_NAMES_TR[r]}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setPendingSubstitution(null)}
+            className="text-xs bg-black/50 hover:bg-black text-slate-300 px-2 py-0.5 rounded border border-white/20 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Yükseltme Bildirim Çubuğu */}
       {pendingUpgrade && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-sky-950/95 border border-sky-400/80 rounded-xl px-4 py-1.5 shadow-2xl flex items-center gap-3 animate-in fade-in">
+        <div className={`fixed ${isMobile ? 'top-7' : 'top-14'} left-1/2 -translate-x-1/2 z-50 bg-sky-950/95 border border-sky-400/80 rounded-xl px-4 py-1.5 shadow-2xl flex items-center gap-3 animate-in fade-in`}>
           <span className="text-xs font-bold text-sky-200">
             {pendingUpgrade.type === 'city' ? 'Köy' : 'Şehir'} seçin
           </span>
@@ -419,7 +504,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
       {/* 2. OYUN MATI (RED VELVET FELT TABLE) */}
       <GameMat playerCount={3}>
         {/* Üst Alan: 2 Rakip Oyuncu */}
-        <div className="w-full flex items-start justify-between gap-2 sm:gap-4 pt-1 sm:pt-10">
+        <div className={`w-full flex items-start justify-between gap-2 sm:gap-4 ${isMobile ? 'pt-1' : 'pt-1 sm:pt-10'}`}>
           {/* Sol Rakip (oppLeft) */}
           {oppLeft && (
             <div className="flex flex-col items-start gap-1 relative p-1 transition-all duration-300">
@@ -448,18 +533,30 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 {/* Sol Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
                 <div className="flex flex-wrap gap-1 sm:gap-2 items-end max-w-[200px] sm:max-w-md pt-1">
                   {/* Settlement Stacks */}
-                  {oppLeftArea?.stacks.map((stack) => (
-                    <CardStack
-                      key={stack.id}
-                      stack={stack}
-                      onInspectCard={onInspectCard}
-                      scale={opponentCardScale}
-                      baseWidth={125}
-                      baseHeight={194}
-                      position={positionsByPlayer[oppLeft]?.[stack.id]}
-                      zIndex={cardZIndices[stack.id]}
-                    />
-                  ))}
+                  {isMobile
+                    ? groupSettlementStacks(oppLeftArea?.stacks).map((group) => (
+                        <CardStack
+                          key={group.primaryStack.id}
+                          stack={group.primaryStack}
+                          count={group.count}
+                          onInspectCard={onInspectCard}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                        />
+                      ))
+                    : oppLeftArea?.stacks.map((stack) => (
+                        <CardStack
+                          key={stack.id}
+                          stack={stack}
+                          onInspectCard={onInspectCard}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppLeft]?.[stack.id]}
+                          zIndex={cardZIndices[stack.id]}
+                        />
+                      ))}
 
                   {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
                   {isMobile ? (
@@ -590,18 +687,30 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 {/* Sağ Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
                 <div className="flex flex-wrap gap-1 sm:gap-2 items-end justify-end max-w-[200px] sm:max-w-md pt-1">
                   {/* Settlement Stacks */}
-                  {oppRightArea?.stacks.map((stack) => (
-                    <CardStack
-                      key={stack.id}
-                      stack={stack}
-                      onInspectCard={onInspectCard}
-                      scale={opponentCardScale}
-                      baseWidth={125}
-                      baseHeight={194}
-                      position={positionsByPlayer[oppRight]?.[stack.id]}
-                      zIndex={cardZIndices[stack.id]}
-                    />
-                  ))}
+                  {isMobile
+                    ? groupSettlementStacks(oppRightArea?.stacks).map((group) => (
+                        <CardStack
+                          key={group.primaryStack.id}
+                          stack={group.primaryStack}
+                          count={group.count}
+                          onInspectCard={onInspectCard}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                        />
+                      ))
+                    : oppRightArea?.stacks.map((stack) => (
+                        <CardStack
+                          key={stack.id}
+                          stack={stack}
+                          onInspectCard={onInspectCard}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppRight]?.[stack.id]}
+                          zIndex={cardZIndices[stack.id]}
+                        />
+                      ))}
 
                   {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
                   {isMobile ? (
@@ -721,46 +830,72 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           {/* 1. Masadaki Fiziksel Kartlar (3P'de en sola koymak yerine el kartlarının hemen solunda ve bitişik) */}
           <div className="relative z-20 flex-shrink-0">
             <div className={`flex flex-wrap gap-1 sm:gap-2.5 items-end justify-end ${isMobilePortrait ? 'max-w-[190px]' : isMobileLandscape ? 'max-w-[340px] mr-2' : 'max-w-[140px] sm:max-w-xl lg:max-w-4xl'}`}>
-            {/* Settlement Stacks (Köy -> Şehir -> Büyükşehir) */}
-            {youArea?.stacks.map((stack, index) => {
-              const isSettlement = stack.top === 'settlement';
-              const isCity = stack.top === 'city';
+            {/* Settlement Stacks (Köy -> Şehir -> Büyükşehir): Mobilde aynı tür binalar gruplanır, PC'de serbest sürüklenir */}
+            {isMobile
+              ? groupSettlementStacks(youArea?.stacks).map((group) => {
+                  const stack = group.primaryStack;
+                  const isSettlement = stack.top === 'settlement';
+                  const isCity = stack.top === 'city';
+                  const canSelectForCity = pendingUpgrade?.type === 'city' && isSettlement;
+                  const canSelectForMetro = pendingUpgrade?.type === 'metropolis' && isCity;
+                  const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
+                  const isSelected = group.stacks.some((s) => s.id === selectedStackId);
 
-              const canSelectForCity = pendingUpgrade?.type === 'city' && isSettlement;
-              const canSelectForMetro = pendingUpgrade?.type === 'metropolis' && isCity;
-              const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
-              const isSelected = selectedStackId === stack.id;
+                  return (
+                    <CardStack
+                      key={stack.id}
+                      stack={stack}
+                      count={group.count}
+                      isSelectable={isSelectable}
+                      isSelected={isSelected}
+                      onSelect={handleConfirmUpgrade}
+                      onInspectCard={onInspectCard}
+                      scale={playerCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      isDraggable={false}
+                    />
+                  );
+                })
+              : youArea?.stacks.map((stack, index) => {
+                  const isSettlement = stack.top === 'settlement';
+                  const isCity = stack.top === 'city';
 
-              const clampFn = createSafeZoneClamper({
-                layout: '3P',
-                handPosition: 'bottom-center',
-                slotIndex: index,
-                totalSlots: totalYouCards,
-                cardWidth: Math.round(125 * playerCardScale),
-              });
+                  const canSelectForCity = pendingUpgrade?.type === 'city' && isSettlement;
+                  const canSelectForMetro = pendingUpgrade?.type === 'metropolis' && isCity;
+                  const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
+                  const isSelected = selectedStackId === stack.id;
 
-              return (
-                <CardStack
-                  key={stack.id}
-                  stack={stack}
-                  isSelectable={isSelectable}
-                  isSelected={isSelected}
-                  onSelect={handleConfirmUpgrade}
-                  onInspectCard={onInspectCard}
-                  scale={playerCardScale}
-                  baseWidth={125}
-                  baseHeight={194}
-                  isDraggable={!isMobile}
-                  position={cardPositions[stack.id]}
-                  zIndex={cardZIndices[stack.id]}
-                  onBringToFront={() => bringToFront(stack.id)}
-                  onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
-                  onDragMove={(pos) => broadcastCardPosition(stack.id, pos)}
-                  onDragChange={setIsCardDragging}
-                  clampPosition={clampFn}
-                />
-              );
-            })}
+                  const clampFn = createSafeZoneClamper({
+                    layout: '3P',
+                    handPosition: 'bottom-center',
+                    slotIndex: index,
+                    totalSlots: totalYouCards,
+                    cardWidth: Math.round(125 * playerCardScale),
+                  });
+
+                  return (
+                    <CardStack
+                      key={stack.id}
+                      stack={stack}
+                      isSelectable={isSelectable}
+                      isSelected={isSelected}
+                      onSelect={handleConfirmUpgrade}
+                      onInspectCard={onInspectCard}
+                      scale={playerCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      isDraggable={!isMobile}
+                      position={cardPositions[stack.id]}
+                      zIndex={cardZIndices[stack.id]}
+                      onBringToFront={() => bringToFront(stack.id)}
+                      onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
+                      onDragMove={(pos) => broadcastCardPosition(stack.id, pos)}
+                      onDragChange={setIsCardDragging}
+                      clampPosition={clampFn}
+                    />
+                  );
+                })}
 
             {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de serbest sürüklenebilir kartlar */}
             {isMobile ? (
@@ -967,7 +1102,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
       {/* AKSİYON BUTONLARI (3 Kişilik Oyunda Mobilde Sol Altta, PC'de Sağ Altta: Ticaret & Turu Bitir) */}
       <TableActionButtons
         layout="3P"
-        className={isMobile ? 'fixed bottom-2 left-2 sm:bottom-4 sm:left-4 z-40' : undefined}
+        compact={isMobile}
+        className={isMobile ? 'fixed bottom-2 left-2 z-40' : undefined}
         onOpenTrade={onOpenTrade}
         onEndTurn={onEndTurn}
         isActive={isActive}

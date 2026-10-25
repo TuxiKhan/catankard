@@ -16,9 +16,46 @@ export interface CardPosition {
   y: number;
 }
 
+export interface GroupedSettlementStack {
+  key: string;
+  primaryStack: SettlementStack;
+  stacks: SettlementStack[];
+  count: number;
+}
+
+/**
+ * Mobilde aynı seviyedeki bina yığınlarını (Köy xN, Şehir xN, Büyükşehir xN)
+ * tek bir grup olarak paketler.
+ */
+export function groupSettlementStacks(
+  stacks: SettlementStack[] | undefined | null
+): GroupedSettlementStack[] {
+  if (!stacks || stacks.length === 0) return [];
+  const groups = new Map<string, GroupedSettlementStack>();
+  for (const st of stacks) {
+    const groupKey =
+      st.top === 'metropolis' ? `metropolis-${st.metropolis?.kind ?? 'A'}` : st.top;
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.stacks.push(st);
+      existing.count += 1;
+    } else {
+      groups.set(groupKey, {
+        key: groupKey,
+        primaryStack: st,
+        stacks: [st],
+        count: 1,
+      });
+    }
+  }
+  return Array.from(groups.values());
+}
+
 export interface CardStackProps {
   /** Yığın bilgisi (Köy, Şehir, Büyükşehir) */
   stack: SettlementStack;
+  /** Aynı seviyedeki yığın adedi (Mobilde gruplama için, varsayılan: 1) */
+  count?: number;
   /** Yükseltme hedefi olarak seçilebilir mi? */
   isSelectable?: boolean;
   /** Seçili durumda mı? */
@@ -64,6 +101,7 @@ export interface CardStackProps {
 
 export const CardStack: React.FC<CardStackProps> = ({
   stack,
+  count = 1,
   isSelectable = false,
   isSelected = false,
   onInspect,
@@ -92,14 +130,19 @@ export const CardStack: React.FC<CardStackProps> = ({
   const effectiveScale = scale ?? (size === 'sm' ? 0.8 : size === 'lg' ? 1.2 : 1);
   const cardW = Math.round(baseWidth * effectiveScale);
   const cardH = Math.round(baseHeight * effectiveScale);
-  const offset = Math.round(layerOffset * effectiveScale);
 
   const { top, metropolis } = stack;
   const hasCity = top === 'city' || top === 'metropolis';
   const hasMetropolis = top === 'metropolis';
 
-  // Toplam katman sayısı ve konteyner yüksekliği
-  const layerCount = hasMetropolis ? 3 : hasCity ? 2 : 1;
+  // Toplam katman sayısı: Köy xN ise N katman, Şehir ise 2 katman, Büyükşehir ise 3 katman
+  const layerCount = hasMetropolis ? 3 : hasCity ? 2 : Math.max(1, count);
+  const maxExtraH = Math.round(64 * effectiveScale);
+  const rawOffset = Math.round(layerOffset * effectiveScale);
+  const offset =
+    layerCount > 1
+      ? Math.min(rawOffset, Math.max(Math.round(8 * effectiveScale), Math.floor(maxExtraH / (layerCount - 1))))
+      : 0;
   const totalHeight = cardH + (layerCount - 1) * offset;
 
   // Köy kartı resmi (Masada her zaman orijinal köy kartı kullanılır)
@@ -365,31 +408,67 @@ export const CardStack: React.FC<CardStackProps> = ({
           : ''
       } ${className}`}
     >
-      {/* 1. KATMAN: KÖY KARTI (En Altta, Sabit top: 0) */}
-      <div
-        style={{
-          width: `${cardW}px`,
-          height: `${cardH}px`,
-          top: 0,
-          left: 0,
-          zIndex: 1,
-        }}
-        className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-lg ${
-          isSelected || isSelectable
-            ? 'border-sky-400'
-            : ''
-        }`}
-      >
-        <img
-          src={getSettlementImgUrl()}
-          alt="Köy"
-          className="w-full h-full object-contain pointer-events-none"
-          draggable={false}
-          onError={(e) => {
-            (e.currentTarget as HTMLElement).style.display = 'none';
+      {/* 1. KATMAN: KÖY KARTI (Köy xN durumunda basamaklı, Şehir/Büyükşehir durumunda en altta sabit top: 0) */}
+      {!hasCity && count > 1 ? (
+        Array.from({ length: count }).map((_, i) => {
+          const isTop = i === count - 1;
+          return (
+            <div
+              key={`${stack.id}-settlement-${i}`}
+              style={{
+                width: `${cardW}px`,
+                height: `${cardH}px`,
+                top: `${i * offset}px`,
+                left: 0,
+                zIndex: i + 1,
+              }}
+              className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/35 shadow-lg bg-stone-900 ${
+                isSelected || isSelectable ? 'border-sky-400' : ''
+              }`}
+            >
+              <img
+                src={getSettlementImgUrl()}
+                alt="Köy"
+                className="w-full h-full object-contain pointer-events-none"
+                draggable={false}
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+              {isTop && count > 1 && (
+                <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
+                  x{count}
+                </div>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <div
+          style={{
+            width: `${cardW}px`,
+            height: `${cardH}px`,
+            top: 0,
+            left: 0,
+            zIndex: 1,
           }}
-        />
-      </div>
+          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-lg ${
+            isSelected || isSelectable
+              ? 'border-sky-400'
+              : ''
+          }`}
+        >
+          <img
+            src={getSettlementImgUrl()}
+            alt="Köy"
+            className="w-full h-full object-contain pointer-events-none"
+            draggable={false}
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
 
       {/* 2. KATMAN: ŞEHİR KARTI (Köyün üstüne offset px aşağı kaydırılarak biner) */}
       {hasCity && (
@@ -418,6 +497,11 @@ export const CardStack: React.FC<CardStackProps> = ({
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
           />
+          {!hasMetropolis && count > 1 && (
+            <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
+              x{count}
+            </div>
+          )}
         </div>
       )}
 
@@ -450,6 +534,11 @@ export const CardStack: React.FC<CardStackProps> = ({
               (e.currentTarget as HTMLElement).style.display = 'none';
             }}
           />
+          {count > 1 && (
+            <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
+              x{count}
+            </div>
+          )}
         </div>
       )}
     </div>

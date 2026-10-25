@@ -97,16 +97,16 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-8 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-6 animate-in fade-in duration-200"
       onClick={onClose}
     >
       {/* Kapat Butonu */}
       <button
         onClick={onClose}
-        className="absolute top-5 right-5 z-20 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition shadow-lg"
+        className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 sm:p-2 rounded-full transition shadow-lg"
         title="Kapat (ESC)"
       >
-        <X size={26} />
+        <X size={24} />
       </button>
 
       {/* Sol Kaydırma Oku */}
@@ -116,10 +116,10 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
             e.stopPropagation();
             scroll('left');
           }}
-          className="hidden md:flex absolute left-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
+          className="flex absolute left-2 sm:left-4 z-20 w-9 h-9 sm:w-12 sm:h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
           title="Sola Kaydır"
         >
-          <ChevronLeft size={30} />
+          <ChevronLeft size={26} />
         </button>
       )}
 
@@ -130,10 +130,10 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
             e.stopPropagation();
             scroll('right');
           }}
-          className="hidden md:flex absolute right-4 z-20 w-12 h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
+          className="flex absolute right-2 sm:right-4 z-20 w-9 h-9 sm:w-12 sm:h-12 items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/80 hover:text-white backdrop-blur-md transition shadow-2xl border border-white/20"
           title="Sağa Kaydır"
         >
-          <ChevronRight size={30} />
+          <ChevronRight size={26} />
         </button>
       )}
 
@@ -142,14 +142,18 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
         ref={scrollRef}
         onWheel={handleWheel}
         onClick={(e) => e.stopPropagation()}
-        className={`overflow-x-auto flex items-center gap-6 p-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing select-none ${
+        className={`overflow-x-auto flex items-center gap-4 sm:gap-6 px-6 py-2 sm:p-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing select-none ${
           cards.length <= 1 ? 'justify-center' : ''
         }`}
       >
         {cards.map((card) => (
           <div
             key={card.id}
-            className="shrink-0 w-[240px] h-[348px] sm:w-[280px] sm:h-[406px] md:w-[310px] md:h-[450px] rounded-2xl overflow-hidden shadow-2xl transition-transform hover:scale-105 duration-200"
+            style={{
+              height: 'min(76dvh, 440px)',
+              aspectRatio: '125 / 194',
+            }}
+            className="shrink-0 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl transition-transform hover:scale-105 duration-200"
           >
             <img
               src={card.imageUrl}

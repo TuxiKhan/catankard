@@ -51,7 +51,12 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
 
   const cardW = Math.round(baseWidth * scale);
   const cardH = Math.round(baseHeight * scale);
-  const offset = Math.round(layerOffset * scale);
+  const maxExtraH = Math.round(64 * scale);
+  const rawOffset = Math.round(layerOffset * scale);
+  const offset =
+    count > 1
+      ? Math.min(rawOffset, Math.max(Math.round(8 * scale), Math.floor(maxExtraH / (count - 1))))
+      : 0;
   const totalH = cardH + (count - 1) * offset;
 
   // Sürükleme durumları (tüm paketi tek seferde taşır)
