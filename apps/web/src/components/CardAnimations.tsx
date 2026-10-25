@@ -266,18 +266,16 @@ export interface DealingCardsOverlayProps {
 export const DealingCardsOverlay: React.FC<DealingCardsOverlayProps> = ({
   playerCount = 4,
   onComplete,
-  onSkip,
 }) => {
   const [cardsDealt, setCardsDealt] = useState<number>(0);
 
   // Dağıtılacak kart hedefleri (Ekran köşelerine doğru uçuş koordinatları)
-  // [dx: viewport px, dy: viewport px, rot: derece, label]
   const targetCoordinates = [
-    { dx: '0vw', dy: '35vh', rot: '0deg', label: 'Senin Elin' }, // Alt (Kendisi)
-    { dx: '-35vw', dy: '-30vh', rot: '-20deg', label: 'Rakip 1' }, // Sol Üst
-    { dx: '35vw', dy: '-30vh', rot: '20deg', label: 'Rakip 2' }, // Sağ Üst
+    { dx: '32vw', dy: '34vh', rot: '-8deg', label: 'Senin Elin' }, // Sağ Alt (Kendisi)
+    { dx: '-36vw', dy: '-32vh', rot: '-20deg', label: 'Rakip 1' }, // Sol Üst
+    { dx: '36vw', dy: '-32vh', rot: '20deg', label: 'Rakip 2' }, // Sağ Üst
     ...(playerCount === 4
-      ? [{ dx: '-35vw', dy: '25vh', rot: '-10deg', label: 'Rakip 3' }] // Sol Alt
+      ? [{ dx: '-36vw', dy: '32vh', rot: '-12deg', label: 'Rakip 3' }] // Sol Alt
       : []),
   ];
 
@@ -293,11 +291,11 @@ export const DealingCardsOverlay: React.FC<DealingCardsOverlayProps> = ({
           clearInterval(interval);
           setTimeout(() => {
             onComplete?.();
-          }, 600);
+          }, 550);
         }
         return next;
       });
-    }, 140); // 140ms aralıkla staggered uçuş
+    }, 110); // 110ms aralıkla hızlı ve akıcı uçuş
 
     return () => clearInterval(interval);
   }, [totalCards, onComplete]);
@@ -308,38 +306,26 @@ export const DealingCardsOverlay: React.FC<DealingCardsOverlayProps> = ({
 
       {/* Merkez Deste Konumu */}
       <div className="relative perspective-1000 flex items-center justify-center">
-        {/* Merkezde Deste Gövdesi */}
-        <div
-          className="relative rounded-xl border-2 border-amber-500/80 shadow-2xl bg-amber-950 overflow-hidden"
-          style={{ width: '90px', height: '130px' }}
-        >
-          <img
-            src={assetUrl('/assets/cards/resource/resource_back.png')}
-            alt="Deste"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
         {/* Uçuş Halindeki Dağıtılan Kartlar */}
         {Array.from({ length: cardsDealt }).map((_, index) => {
           const target = targetCoordinates[index % targetCoordinates.length] || {
-            dx: '0vw',
-            dy: '35vh',
+            dx: '32vw',
+            dy: '34vh',
             rot: '0deg',
             label: 'Senin Elin',
           };
           return (
             <div
               key={`deal-flight-${index}`}
-              className="absolute rounded-xl overflow-hidden border border-amber-400 shadow-2xl preserve-3d"
+              className="absolute rounded-lg overflow-hidden border border-amber-400 shadow-2xl preserve-3d"
               style={
                 {
-                  width: '84px',
-                  height: '120px',
+                  width: '64px',
+                  height: '96px',
                   '--target-x': target.dx,
                   '--target-y': target.dy,
                   '--target-rot': target.rot,
-                  animation: 'dealFlightArc 0.75s cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
+                  animation: 'dealFlightArc 0.65s cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
                   zIndex: 100 + index,
                 } as React.CSSProperties
               }
@@ -347,28 +333,12 @@ export const DealingCardsOverlay: React.FC<DealingCardsOverlayProps> = ({
               <img
                 src={assetUrl('/assets/cards/resource/resource_back.png')}
                 alt="Dağıtılan Kart"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
               <div className="absolute inset-0 bg-linear-to-tr from-amber-500/30 via-transparent to-white/40 pointer-events-none" />
             </div>
           );
         })}
-      </div>
-
-      {/* Alt Bilgi & Atla Butonu */}
-      <div className="absolute bottom-12 pointer-events-auto flex flex-col items-center gap-2">
-        <div className="text-amber-300 font-extrabold text-sm md:text-base tracking-wider uppercase drop-shadow-md flex items-center gap-2 bg-black/60 px-4 py-1.5 rounded-full border border-amber-500/40">
-          <span className="animate-spin inline-block">🎴</span>
-          <span>Kartlar Dağıtılıyor ({cardsDealt} / {totalCards})</span>
-        </div>
-        {onSkip && (
-          <button
-            onClick={onSkip}
-            className="text-xs text-white/70 hover:text-white underline hover:no-underline px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-xs transition"
-          >
-            Dağıtımı Atla ➔
-          </button>
-        )}
       </div>
     </div>
   );
@@ -642,7 +612,7 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
 };
 
 /* ==========================================================================
-   6. TAM EKRAN AÇILIŞ SİNEMATİĞİ (Game Opening Cinematic Modal)
+   6. DOĞRUDAN MASA ÜZERİNDE KART DAĞITMA ANİMASYONU (Siyah Ekran Olmadan)
    ========================================================================== */
 export interface GameOpeningCinematicProps {
   isOpen: boolean;
@@ -655,72 +625,13 @@ export const GameOpeningCinematic: React.FC<GameOpeningCinematicProps> = ({
   view,
   onFinish,
 }) => {
-  const [stage, setStage] = useState<'shuffle' | 'deal' | 'done'>('shuffle');
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setStage('shuffle');
-    cardAudio.playShuffle();
-
-    // 1.5s Deste Karılır
-    const shuffleTimer = setTimeout(() => {
-      setStage('deal');
-      cardAudio.playDealOrDraw();
-
-      // 1.5s Kartlar Dağıtılır
-      const dealTimer = setTimeout(() => {
-        setStage('done');
-        onFinish();
-      }, 1500);
-
-      return () => clearTimeout(dealTimer);
-    }, 1500);
-
-    return () => clearTimeout(shuffleTimer);
-  }, [isOpen, onFinish]);
-
-  if (!isOpen || stage === 'done') return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 select-none">
-      <CardAnimationStylesInjector />
-
-      {/* Başlık */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_2px_10px_rgba(251,191,36,0.5)] tracking-wider uppercase mb-2">
-          {stage === 'shuffle' ? '🎲 Kartlar Karılıyor...' : '🎴 Masaya Dağıtılıyor...'}
-        </h2>
-        <p className="text-sm text-stone-300">
-          {stage === 'shuffle'
-            ? 'Desteler riffle tekniği ile harmanlanıyor'
-            : 'Tüm oyuncuların ellerine başlangıç kartları veriliyor'}
-        </p>
-      </div>
-
-      {/* Sahne */}
-      <div className="relative w-full max-w-xl h-80 flex items-center justify-center">
-        {stage === 'shuffle' ? (
-          <DeckShuffle3D width={120} height={170} />
-        ) : (
-          <DealingCardsOverlay
-            playerCount={view?.turnOrder.length || 4}
-            onComplete={() => {
-              setStage('done');
-              onFinish();
-            }}
-          />
-        )}
-      </div>
-
-      {/* Hızlı Atla Butonu */}
-      <button
-        onClick={onFinish}
-        className="mt-6 px-6 py-2.5 bg-amber-600/80 hover:bg-amber-500 text-white font-bold rounded-xl shadow-lg border border-amber-400/60 transition active:scale-95 text-sm"
-      >
-        Hemen Oyuna Başla ➔
-      </button>
-    </div>
+    <DealingCardsOverlay
+      playerCount={view?.turnOrder.length || 4}
+      onComplete={onFinish}
+    />
   );
 };
 

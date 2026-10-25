@@ -1,4 +1,6 @@
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { FolderOpen, X } from 'lucide-react';
 import type {
   BuildingType,
   MetropolisBKind,
@@ -24,7 +26,7 @@ export interface GroupedSettlementStack {
 }
 
 /**
- * Mobilde aynı seviyedeki bina yığınlarını (Köy xN, Şehir xN, Büyükşehir xN)
+ * Mobilde aynı seviyedeki bina yığınlarını (Köy, Şehir, Büyükşehir)
  * tek bir grup olarak paketler.
  */
 export function groupSettlementStacks(
@@ -56,6 +58,8 @@ export interface CardStackProps {
   stack: SettlementStack;
   /** Aynı seviyedeki yığın adedi (Mobilde gruplama için, varsayılan: 1) */
   count?: number;
+  /** Sadece kart başlıklarının göründüğü, tıklanınca klasör penceresi olarak açılan mod */
+  folderMode?: boolean;
   /** Yükseltme hedefi olarak seçilebilir mi? */
   isSelectable?: boolean;
   /** Seçili durumda mı? */
@@ -102,6 +106,7 @@ export interface CardStackProps {
 export const CardStack: React.FC<CardStackProps> = ({
   stack,
   count = 1,
+  folderMode = false,
   isSelectable = false,
   isSelected = false,
   onInspect,
@@ -123,10 +128,11 @@ export const CardStack: React.FC<CardStackProps> = ({
   zIndex,
   onBringToFront,
 }) => {
+  const [isFolderOpen, setIsFolderOpen] = useState(false);
+
   const inspectFn = onInspectCard || onInspect;
   const selectFn = onSelectUpgrade || onSelect;
 
-  // Taban boyutları büyütüldü: ~125px x 186px
   const effectiveScale = scale ?? (size === 'sm' ? 0.8 : size === 'lg' ? 1.2 : 1);
   const cardW = Math.round(baseWidth * effectiveScale);
   const cardH = Math.round(baseHeight * effectiveScale);
@@ -135,20 +141,84 @@ export const CardStack: React.FC<CardStackProps> = ({
   const hasCity = top === 'city' || top === 'metropolis';
   const hasMetropolis = top === 'metropolis';
 
-  // Toplam katman sayısı: Köy xN ise N katman, Şehir ise 2 katman, Büyükşehir ise 3 katman
-  const layerCount = hasMetropolis ? 3 : hasCity ? 2 : Math.max(1, count);
+  const metroImgUrl = metropolis
+    ? getMetropolisImageUrl(metropolis)
+    : assetUrl('/assets/cards/building/metropolis_A.png');
+
+  // Yığındaki görsel katmanların listesi (x2/x3 etiketi olmadan her kart kendi başlığıyla yer alır)
+  const layers: Array<{
+    kind: 'settlement' | 'city' | 'metropolis';
+    imgUrl: string;
+    label: string;
+  }> = [];
+
+  if (!hasCity) {
+    for (let i = 0; i < Math.max(1, count); i++) {
+      layers.push({
+        kind: 'settlement',
+        imgUrl: getBuildingImageUrl('settlement'),
+        label: 'Köy',
+      });
+    }
+  } else if (!hasMetropolis) {
+    for (let i = 0; i < Math.max(1, count); i++) {
+      layers.push({
+        kind: 'settlement',
+        imgUrl: getBuildingImageUrl('settlement'),
+        label: 'Köy',
+      });
+      layers.push({
+        kind: 'city',
+        imgUrl: getBuildingImageUrl('city'),
+        label: 'Şehir',
+      });
+    }
+  } else {
+    for (let i = 0; i < Math.max(1, count); i++) {
+      layers.push({
+        kind: 'settlement',
+        imgUrl: getBuildingImageUrl('settlement'),
+        label: 'Köy',
+      });
+      layers.push({
+        kind: 'city',
+        imgUrl: getBuildingImageUrl('city'),
+        label: 'Şehir',
+      });
+      layers.push({
+        kind: 'metropolis',
+        imgUrl: metroImgUrl,
+        label: 'Büyükşehir',
+      });
+    }
+  }
+
+  const layerCount = layers.length;
+
+  // Kapalı klasör modunda yalnızca başlık şeritleri gözükür
+  const topHeaderH = Math.max(18, Math.round(cardH * 0.24));
+  const folderStepH =
+    layerCount > 1
+      ? Math.min(
+          Math.max(10, Math.round(cardH * 0.16)),
+          Math.max(7, Math.floor(Math.round(cardH * 0.44) / (layerCount - 1)))
+        )
+      : 0;
+  const folderTotalH = topHeaderH + (layerCount - 1) * folderStepH;
+
+  // Normal modda dikey basamak yüksekliği
   const maxExtraH = Math.round(64 * effectiveScale);
   const rawOffset = Math.round(layerOffset * effectiveScale);
   const offset =
     layerCount > 1
-      ? Math.min(rawOffset, Math.max(Math.round(8 * effectiveScale), Math.floor(maxExtraH / (layerCount - 1))))
+      ? Math.min(
+          rawOffset,
+          Math.max(Math.round(8 * effectiveScale), Math.floor(maxExtraH / (layerCount - 1)))
+        )
       : 0;
-  const totalHeight = cardH + (layerCount - 1) * offset;
+  const normalTotalH = cardH + (layerCount - 1) * offset;
 
-  // Köy kartı resmi (Masada her zaman orijinal köy kartı kullanılır)
-  const getSettlementImgUrl = (): string => {
-    return getBuildingImageUrl('settlement');
-  };
+  const totalHeight = folderMode ? folderTotalH : normalTotalH;
 
   // Sürükle-bırak durumları
   const [isDragging, setIsDragging] = useState(false);
@@ -161,13 +231,13 @@ export const CardStack: React.FC<CardStackProps> = ({
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef<boolean>(false);
 
-  const triggerInspect = () => {
-    if (inspectFn) {
-      if (hasMetropolis && metropolis) {
-        inspectFn('metropolis', metropolis.kind);
-      } else {
-        inspectFn(top);
-      }
+  const triggerInspect = (layerKind?: 'settlement' | 'city' | 'metropolis') => {
+    if (!inspectFn) return;
+    const targetKind = layerKind ?? top;
+    if (targetKind === 'metropolis' && metropolis) {
+      inspectFn('metropolis', metropolis.kind);
+    } else {
+      inspectFn(targetKind);
     }
   };
 
@@ -196,8 +266,7 @@ export const CardStack: React.FC<CardStackProps> = ({
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     initialPosRef.current = { x: position?.x ?? 0, y: position?.y ?? 0 };
 
-    // Mobilde veya dokunmatikte uzun basarak (400ms) kart detayını inceleme
-    if (inspectFn) {
+    if (inspectFn && !folderMode) {
       if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = window.setTimeout(() => {
         if (!justDraggedRef.current) {
@@ -211,7 +280,7 @@ export const CardStack: React.FC<CardStackProps> = ({
     }
 
     if (!isDraggable) return;
-    if (e.button !== 0) return; // Sadece sol tık
+    if (e.button !== 0) return;
 
     setDragOffset({ x: 0, y: 0 });
 
@@ -234,7 +303,6 @@ export const CardStack: React.FC<CardStackProps> = ({
     const dy = e.clientY - dragStartRef.current.y;
     const dist = Math.hypot(dx, dy);
 
-    // Parmağın veya farenin hareketi 8px'i aşarsa uzun basmayı iptal et
     if (dist > 8) {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
@@ -242,11 +310,9 @@ export const CardStack: React.FC<CardStackProps> = ({
       }
     }
 
-    // Uzun basma penceresi açıldıysa sürüklemeyi başlatma
     if (longPressFiredRef.current) return;
     if (!isDraggable) return;
 
-    // Sürükleme eşiği aşıldığında sürüklemeyi devreye al
     if (!isDragging && dist > 6) {
       justDraggedRef.current = true;
       setIsDragging(true);
@@ -349,6 +415,8 @@ export const CardStack: React.FC<CardStackProps> = ({
     e.stopPropagation();
     if (isSelectable && selectFn) {
       selectFn(stack.id);
+    } else if (folderMode) {
+      setIsFolderOpen(true);
     } else if (!isDraggable && inspectFn) {
       triggerInspect();
     }
@@ -356,65 +424,121 @@ export const CardStack: React.FC<CardStackProps> = ({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    triggerInspect();
+    if (folderMode) {
+      setIsFolderOpen(true);
+    } else {
+      triggerInspect();
+    }
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isDraggable) {
       onPositionChange?.({ x: 0, y: 0 });
+    } else if (folderMode) {
+      setIsFolderOpen(true);
     } else if (inspectFn) {
       triggerInspect();
     }
   };
 
-  const currentX = isDraggable ? (initialPosRef.current.x + dragOffset.x) : 0;
-  const currentY = isDraggable ? (initialPosRef.current.y + dragOffset.y) : 0;
+  const currentX = isDraggable ? initialPosRef.current.x + dragOffset.x : 0;
+  const currentY = isDraggable ? initialPosRef.current.y + dragOffset.y : 0;
   const hasCustomPos = currentX !== 0 || currentY !== 0;
 
   const transformStyle = hasCustomPos
     ? `translate3d(${currentX}px, ${currentY}px, 0)`
     : undefined;
 
+  const folderTitle = hasMetropolis
+    ? 'Büyükşehir İstifi'
+    : hasCity
+    ? 'Şehir & Köy İstifi'
+    : 'Köy İstifi';
+
   return (
-    <div
-      ref={cardRef}
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
-      onDoubleClick={handleDoubleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      style={{
-        width: `${cardW}px`,
-        height: `${totalHeight}px`,
-        transform: transformStyle,
-        transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
-        zIndex: isDragging ? 100 : (zIndex ?? (isSelected ? 20 : isSelectable ? 10 : hasCustomPos ? 5 : 1)),
-        touchAction: isDraggable ? 'none' : 'auto',
-      }}
-      className={`relative select-none ${
-        isDragging
-          ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
-          : isDraggable
-          ? 'cursor-grab hover:scale-[1.02]'
-          : 'cursor-pointer hover:scale-[1.02]'
-      } ${
-        isSelected
-          ? 'ring-4 ring-sky-400 shadow-sky-500/40 shadow-2xl rounded-xl'
-          : isSelectable
-          ? 'ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.7)] animate-pulse rounded-xl'
-          : ''
-      } ${className}`}
-    >
-      {/* 1. KATMAN: KÖY KARTI (Köy xN durumunda basamaklı, Şehir/Büyükşehir durumunda en altta sabit top: 0) */}
-      {!hasCity && count > 1 ? (
-        Array.from({ length: count }).map((_, i) => {
-          const isTop = i === count - 1;
-          return (
+    <>
+      <div
+        ref={cardRef}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        onDoubleClick={handleDoubleClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        style={{
+          width: `${cardW}px`,
+          height: `${totalHeight}px`,
+          transform: transformStyle,
+          transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+          zIndex:
+            isDragging
+              ? 100
+              : zIndex ?? (isSelected ? 20 : isSelectable ? 10 : hasCustomPos ? 5 : 1),
+          touchAction: isDraggable ? 'none' : 'auto',
+        }}
+        className={`relative select-none ${
+          isDragging
+            ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
+            : isDraggable
+            ? 'cursor-grab hover:scale-[1.02]'
+            : 'cursor-pointer hover:scale-[1.03] active:scale-95'
+        } ${
+          isSelected
+            ? 'ring-3 ring-sky-400 shadow-sky-500/40 shadow-2xl rounded-md'
+            : isSelectable
+            ? 'ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] animate-pulse rounded-md'
+            : ''
+        } ${className}`}
+      >
+        {folderMode ? (
+          <>
+            {layers.map((layer, i) => {
+              const isTop = i === layerCount - 1;
+              const topPx = i * folderStepH;
+              const sliceH = isTop ? topHeaderH : folderStepH + 4;
+
+              return (
+                <div
+                  key={`${stack.id}-folder-${i}`}
+                  style={{
+                    width: `${cardW}px`,
+                    height: `${sliceH}px`,
+                    top: `${topPx}px`,
+                    left: 0,
+                    zIndex: i + 1,
+                  }}
+                  className={`absolute rounded-t-md overflow-hidden border shadow-md bg-stone-900 ${
+                    isSelected || isSelectable ? 'border-sky-400' : 'border-black/45'
+                  }`}
+                >
+                  <img
+                    src={layer.imgUrl}
+                    alt={layer.label}
+                    style={{
+                      width: `${cardW}px`,
+                      height: `${cardH}px`,
+                    }}
+                    className="object-contain object-top pointer-events-none select-none"
+                    draggable={false}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              );
+            })}
+            {/* Klasör alt dudak çizgisi */}
             <div
-              key={`${stack.id}-settlement-${i}`}
+              style={{ zIndex: layerCount + 2 }}
+              className="absolute bottom-0 inset-x-0 h-[3px] rounded-b-sm bg-gradient-to-r from-amber-700/90 via-amber-400/90 to-amber-700/90 border-t border-black/50 pointer-events-none"
+            />
+          </>
+        ) : (
+          layers.map((layer, i) => (
+            <div
+              key={`${stack.id}-layer-${i}`}
               style={{
                 width: `${cardW}px`,
                 height: `${cardH}px`,
@@ -427,121 +551,73 @@ export const CardStack: React.FC<CardStackProps> = ({
               }`}
             >
               <img
-                src={getSettlementImgUrl()}
-                alt="Köy"
+                src={layer.imgUrl}
+                alt={layer.label}
                 className="w-full h-full object-contain pointer-events-none"
                 draggable={false}
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
-              {isTop && count > 1 && (
-                <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
-                  x{count}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* KLASÖR AÇILIR PENCERE (Tıklandığında tam kartları gösterir) */}
+      {folderMode &&
+        isFolderOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 animate-in fade-in duration-150 select-none"
+            onClick={() => setIsFolderOpen(false)}
+          >
+            <div
+              className="relative bg-slate-950/95 border-2 border-amber-500/60 rounded-2xl p-3 sm:p-4 shadow-2xl max-w-[92vw] max-h-[88dvh] flex flex-col gap-2.5 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Klasör Başlığı */}
+              <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-1.5">
+                <div className="flex items-center gap-2 text-amber-300 font-black text-xs sm:text-sm">
+                  <FolderOpen size={16} className="text-amber-400" />
+                  <span>{folderTitle}</span>
                 </div>
-              )}
-            </div>
-          );
-        })
-      ) : (
-        <div
-          style={{
-            width: `${cardW}px`,
-            height: `${cardH}px`,
-            top: 0,
-            left: 0,
-            zIndex: 1,
-          }}
-          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-lg ${
-            isSelected || isSelectable
-              ? 'border-sky-400'
-              : ''
-          }`}
-        >
-          <img
-            src={getSettlementImgUrl()}
-            alt="Köy"
-            className="w-full h-full object-contain pointer-events-none"
-            draggable={false}
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-        </div>
-      )}
+                <button
+                  type="button"
+                  onClick={() => setIsFolderOpen(false)}
+                  className="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-1 rounded-lg transition"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
-      {/* 2. KATMAN: ŞEHİR KARTI (Köyün üstüne offset px aşağı kaydırılarak biner) */}
-      {hasCity && (
-        <div
-          style={{
-            width: `${cardW}px`,
-            height: `${cardH}px`,
-            top: `${offset}px`,
-            left: 0,
-            zIndex: 2,
-          }}
-          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-xl ${
-            isSelected
-              ? 'border-yellow-400'
-              : isSelectable
-              ? 'border-emerald-400'
-              : ''
-          }`}
-        >
-          <img
-            src={getBuildingImageUrl('city')}
-            alt="Şehir"
-            className="w-full h-full object-contain pointer-events-none"
-            draggable={false}
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-          {!hasMetropolis && count > 1 && (
-            <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
-              x{count}
+              {/* Klasör İçindeki Tam Kartlar */}
+              <div className="flex items-center gap-2.5 overflow-x-auto py-1 px-1 scrollbar-thin scrollbar-thumb-white/20">
+                {layers.map((layer, i) => (
+                  <div
+                    key={`${stack.id}-open-${i}`}
+                    onClick={() => {
+                      setIsFolderOpen(false);
+                      triggerInspect(layer.kind);
+                    }}
+                    style={{ width: '115px', height: '178px' }}
+                    className="shrink-0 rounded-lg overflow-hidden border border-amber-400/50 shadow-xl cursor-pointer hover:scale-105 transition-transform bg-stone-900"
+                  >
+                    <img
+                      src={layer.imgUrl}
+                      alt={layer.label}
+                      className="w-full h-full object-contain pointer-events-none"
+                      draggable={false}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* 3. KATMAN: BÜYÜKŞEHİR KARTI (Şehrin üzerine offset * 2 px aşağı kaydırılarak biner) */}
-      {hasMetropolis && (
-        <div
-          style={{
-            width: `${cardW}px`,
-            height: `${cardH}px`,
-            top: `${offset * 2}px`,
-            left: 0,
-            zIndex: 3,
-          }}
-          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-2xl ${
-            isSelected || isSelectable
-              ? 'border-sky-400'
-              : ''
-          }`}
-        >
-          <img
-            src={
-              metropolis
-                ? getMetropolisImageUrl(metropolis)
-                : assetUrl('/assets/cards/building/metropolis_A.png')
-            }
-            alt="Büyükşehir"
-            className="w-full h-full object-contain pointer-events-none"
-            draggable={false}
-            onError={(e) => {
-              (e.currentTarget as HTMLElement).style.display = 'none';
-            }}
-          />
-          {count > 1 && (
-            <div className="absolute top-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 py-0.2 rounded shadow border border-amber-500/50 pointer-events-none z-10">
-              x{count}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 };
 

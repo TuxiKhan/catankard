@@ -537,7 +537,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 </div>
 
                 {/* Rakip 1 Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
-                <div className="flex flex-wrap gap-1 sm:gap-2 items-end max-w-[200px] sm:max-w-[320px] pt-1">
+                <div className={`flex ${isMobile ? 'flex-nowrap gap-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[320px]'} items-end pt-1`}>
                   {/* Settlement Stacks */}
                   {isMobile
                     ? groupSettlementStacks(opp1Area?.stacks).map((group) => (
@@ -545,6 +545,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                           key={group.primaryStack.id}
                           stack={group.primaryStack}
                           count={group.count}
+                          folderMode={true}
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
@@ -564,7 +565,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp1}-roads`}
@@ -574,6 +575,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp1]?.[`${opp1}-road-0`]}
                       zIndex={cardZIndices[`${opp1}-road-0`]}
@@ -599,7 +601,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp1}-knights`}
@@ -609,6 +611,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp1]?.[`${opp1}-knight-0`]}
                       zIndex={cardZIndices[`${opp1}-knight-0`]}
@@ -642,6 +645,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp1]?.[`${opp1}-bonus-longest-route`]}
                       zIndex={cardZIndices[`${opp1}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
@@ -655,6 +659,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp1]?.[`${opp1}-bonus-largest-army`]}
                       zIndex={cardZIndices[`${opp1}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
@@ -691,13 +696,14 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 </div>
 
                 {/* Rakip 2 Masadaki Fiziksel Kartları */}
-                <div className="flex flex-wrap gap-1 sm:gap-2 items-end justify-end max-w-[200px] sm:max-w-[340px] pt-1">
+                <div className={`flex ${isMobile ? 'flex-nowrap gap-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[340px]'} items-end justify-end pt-1`}>
                   {isMobile
                     ? groupSettlementStacks(opp2Area?.stacks).map((group) => (
                         <CardStack
                           key={group.primaryStack.id}
                           stack={group.primaryStack}
                           count={group.count}
+                          folderMode={true}
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
@@ -717,7 +723,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp2}-roads`}
@@ -727,6 +733,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp2]?.[`${opp2}-road-0`]}
                       zIndex={cardZIndices[`${opp2}-road-0`]}
@@ -752,7 +759,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp2}-knights`}
@@ -762,6 +769,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp2]?.[`${opp2}-knight-0`]}
                       zIndex={cardZIndices[`${opp2}-knight-0`]}
@@ -794,6 +802,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp2]?.[`${opp2}-bonus-longest-route`]}
                       zIndex={cardZIndices[`${opp2}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
@@ -807,6 +816,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp2]?.[`${opp2}-bonus-largest-army`]}
                       zIndex={cardZIndices[`${opp2}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
@@ -857,13 +867,14 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 </div>
 
                 {/* Rakip 3 Masadaki Fiziksel Kartları */}
-                <div className={`flex flex-wrap gap-1 sm:gap-2 items-end max-w-[160px] sm:max-w-[220px] lg:max-w-[340px] ${isMobile ? 'pr-1' : 'pr-1 sm:pr-10 lg:pr-14'}`}>
+                <div className={`flex ${isMobile ? 'flex-nowrap gap-1 pr-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[160px] sm:max-w-[220px] lg:max-w-[340px] pr-1 sm:pr-10 lg:pr-14'} items-end`}>
                   {isMobile
                     ? groupSettlementStacks(opp3Area?.stacks).map((group) => (
                         <CardStack
                           key={group.primaryStack.id}
                           stack={group.primaryStack}
                           count={group.count}
+                          folderMode={true}
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
@@ -883,7 +894,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp3}-roads`}
@@ -893,6 +904,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp3]?.[`${opp3}-road-0`]}
                       zIndex={cardZIndices[`${opp3}-road-0`]}
@@ -918,7 +930,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp3}-knights`}
@@ -928,6 +940,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       baseWidth={125}
                       baseHeight={194}
                       layerOffset={30}
+                      folderMode={true}
                       isDraggable={false}
                       position={positionsByPlayer[opp3]?.[`${opp3}-knight-0`]}
                       zIndex={cardZIndices[`${opp3}-knight-0`]}
@@ -960,6 +973,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp3]?.[`${opp3}-bonus-longest-route`]}
                       zIndex={cardZIndices[`${opp3}-bonus-longest-route`]}
                       onInspect={() => onInspectCard('longest_route')}
@@ -973,6 +987,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={186}
                       baseHeight={120}
+                      folderMode={isMobile}
                       position={positionsByPlayer[opp3]?.[`${opp3}-bonus-largest-army`]}
                       zIndex={cardZIndices[`${opp3}-bonus-largest-army`]}
                       onInspect={() => onInspectCard('largest_army')}
@@ -989,7 +1004,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           <div className={`flex ${isMobilePortrait ? 'flex-col items-end' : 'items-end justify-end'} gap-1 sm:gap-4 lg:gap-8 relative p-0.5 sm:p-1 transition-all duration-300 pb-1 w-full pl-1 sm:pl-10 lg:pl-16 pr-1 sm:pr-2`}>
             {/* 1. Masadaki Fiziksel Kartlar (Kendi el kartlarının hemen solunda ve bitişik) */}
             <div className="relative z-20 flex-shrink-0">
-              <div className={`flex flex-wrap gap-1 sm:gap-2.5 items-end justify-end ${isMobilePortrait ? 'max-w-[190px]' : isMobileLandscape ? 'max-w-[340px] mr-2' : 'max-w-[140px] sm:max-w-xl lg:max-w-4xl'}`}>
+              <div className={`flex ${isMobile ? 'flex-nowrap gap-1 mr-1' : 'flex-wrap gap-1 sm:gap-2.5 max-w-[140px] sm:max-w-xl lg:max-w-4xl'} items-end justify-end`}>
               {/* Yerleşim Yığınları: Mobilde aynı tür binalar gruplanır, PC'de serbest sürüklenir */}
               {isMobile
                 ? groupSettlementStacks(youArea?.stacks).map((group) => {
@@ -1014,6 +1029,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         baseWidth={125}
                         baseHeight={194}
                         isDraggable={false}
+                        folderMode={true}
                       />
                     );
                   })
@@ -1068,6 +1084,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   baseHeight={194}
                   layerOffset={30}
                   isDraggable={false}
+                  folderMode={true}
                   position={cardPositions[`${view.you}-road-0`] || cardPositions['you-4p-road-0']}
                   zIndex={cardZIndices[`${view.you}-road-0`] || cardZIndices['you-4p-road-0']}
                   onInspect={() => onInspectCard('road')}
@@ -1118,6 +1135,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   baseHeight={194}
                   layerOffset={30}
                   isDraggable={false}
+                  folderMode={true}
                   position={cardPositions[`${view.you}-knight-0`] || cardPositions['you-4p-knight-0']}
                   zIndex={cardZIndices[`${view.you}-knight-0`] || cardZIndices['you-4p-knight-0']}
                   onInspect={() => onInspectCard('knight')}
@@ -1166,6 +1184,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   baseWidth={186}
                   baseHeight={120}
                   isDraggable={!isMobile}
+                  folderMode={isMobile}
                   position={
                     cardPositions[`${view.you}-bonus-longest-route`] ||
                     cardPositions['bonus-4p-longest-route']
@@ -1204,6 +1223,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   baseWidth={186}
                   baseHeight={120}
                   isDraggable={!isMobile}
+                  folderMode={isMobile}
                   position={
                     cardPositions[`${view.you}-bonus-largest-army`] ||
                     cardPositions['bonus-4p-largest-army']
