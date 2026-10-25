@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import type { BuildingCard, BuildingType, PlayerId, PlayerView, Resource } from '@catankard/engine';
+import type { BuildingCard, PlayerView } from '@catankard/engine';
 import {
   type FlyingCard,
   type ImpactEffect,
   cardAudio,
 } from '../lib/animationHooks.ts';
-import { getBuildingImageUrl, getResourceImageUrl } from '../lib/cardImages.ts';
+import { getBuildingImageUrl } from '../lib/cardImages.ts';
 import { assetUrl } from '../lib/assetUrl.ts';
 
 /* ==========================================================================
@@ -121,15 +121,15 @@ export const CARD_ANIMATION_STYLES = `
   }
   20% {
     opacity: 1;
-    transform: translate3d(calc(var(--target-x) * 0.2), calc(var(--target-y) * 0.2), 60px) rotateZ(calc(var(--target-rot) * 0.3)) scale(1.1);
+    transform: translate3d(calc(var(--target-x) * 0.2), calc(var(--target-y) * 0.2), 60px) rotateZ(calc(var(--target-rot) * 0.3)) scale(1.08);
   }
   75% {
     opacity: 1;
-    transform: translate3d(calc(var(--target-x) * 0.8), calc(var(--target-y) * 0.8), 25px) rotateZ(calc(var(--target-rot) * 0.85)) scale(1.02);
+    transform: translate3d(calc(var(--target-x) * 0.85), calc(var(--target-y) * 0.85), 25px) rotateZ(calc(var(--target-rot) * 0.85)) scale(1.0);
   }
   100% {
-    opacity: 0.15;
-    transform: translate3d(var(--target-x), var(--target-y), 0) rotateZ(var(--target-rot)) scale(0.85);
+    opacity: 0.2;
+    transform: translate3d(var(--target-x), var(--target-y), 0) rotateZ(var(--target-rot)) scale(0.88);
   }
 }
 
@@ -171,7 +171,6 @@ export const DeckShuffle3D: React.FC<DeckShuffle3DProps> = ({
   height = 155,
   className = '',
 }) => {
-  // 10 adet yaprak kart ile gerçek 3D deste katmanları
   const leftCards = [0, 1, 2, 3, 4];
   const rightCards = [0, 1, 2, 3, 4];
 
@@ -182,7 +181,6 @@ export const DeckShuffle3D: React.FC<DeckShuffle3DProps> = ({
     >
       <CardAnimationStylesInjector />
 
-      {/* Merkez Deste Tabanı / Gölge */}
       <div
         className="absolute rounded-xl bg-black/60 blur-md pointer-events-none"
         style={{
@@ -192,7 +190,6 @@ export const DeckShuffle3D: React.FC<DeckShuffle3DProps> = ({
         }}
       />
 
-      {/* SOL YARIM DESTE (Sol pile riffle) */}
       <div
         className="absolute preserve-3d"
         style={{
@@ -220,7 +217,6 @@ export const DeckShuffle3D: React.FC<DeckShuffle3DProps> = ({
         ))}
       </div>
 
-      {/* SAĞ YARIM DESTE (Sağ pile riffle) */}
       <div
         className="absolute preserve-3d"
         style={{
@@ -248,104 +244,232 @@ export const DeckShuffle3D: React.FC<DeckShuffle3DProps> = ({
         ))}
       </div>
 
-      {/* Ortadaki Karılma Kıvılcım Haresi */}
       <div className="absolute w-24 h-24 rounded-full bg-amber-400/20 blur-xl pointer-events-none animate-pulse" />
     </div>
   );
 };
 
 /* ==========================================================================
-   2. OYUN BAŞLANGICINDA DAĞITILMA ANİMASYONU (Dealing Cards Overlay)
+   2. OYUN BAŞLANGICINDA DAĞITILMA ANİMASYONU (Her Kart İçin Birebir Dağıtım)
    ========================================================================== */
 export interface DealingCardsOverlayProps {
+  view?: PlayerView | null;
   playerCount?: number;
+  onTableCardsDealt?: () => void;
   onComplete?: () => void;
   onSkip?: () => void;
 }
 
+interface DealScheduleItem {
+  kind: 'table' | 'hand';
+  dx: string;
+  dy: string;
+  rot: string;
+  imgUrl: string;
+}
+
 export const DealingCardsOverlay: React.FC<DealingCardsOverlayProps> = ({
+  view,
   playerCount = 4,
+  onTableCardsDealt,
   onComplete,
 }) => {
   const [cardsDealt, setCardsDealt] = useState<number>(0);
 
-  // Dağıtılacak kart hedefleri (Ekran köşelerine doğru uçuş koordinatları)
-  const targetCoordinates = [
-    { dx: '32vw', dy: '34vh', rot: '-8deg', label: 'Senin Elin' }, // Sağ Alt (Kendisi)
-    { dx: '-36vw', dy: '-32vh', rot: '-20deg', label: 'Rakip 1' }, // Sol Üst
-    { dx: '36vw', dy: '-32vh', rot: '20deg', label: 'Rakip 2' }, // Sağ Üst
-    ...(playerCount === 4
-      ? [{ dx: '-36vw', dy: '32vh', rot: '-12deg', label: 'Rakip 3' }] // Sol Alt
-      : []),
-  ];
+  // Her oyuncunun gerçek başlangıç yer kartları (1 Köy + 1 Başlangıç Yolu) ve gerçek el kartı sayısı kadar birebir dağıtım listesi
+  const schedule = React.useMemo<DealScheduleItem[]>(() => {
+    const items: DealScheduleItem[] = [];
+    const count = view?.turnOrder.length || playerCount;
 
-  // Her oyuncuya 3 kart dağıtılır (Toplam 3 * oyuncu sayısı kart)
-  const totalCards = playerCount * 3;
+    // Koltukların yer kartı ve el kartı hedef koordinatları
+    const seats =
+      count === 3
+        ? [
+            {
+              pid: view?.you ?? 'p1',
+              tableDx: '18vw',
+              tableDy: '32vh',
+              handDx: '36vw',
+              handDy: '34vh',
+              rot: '-6deg',
+            },
+            {
+              pid: view?.turnOrder.filter((id) => id !== view?.you)[0] ?? 'p2',
+              tableDx: '-22vw',
+              tableDy: '-30vh',
+              handDx: '-38vw',
+              handDy: '-32vh',
+              rot: '-14deg',
+            },
+            {
+              pid: view?.turnOrder.filter((id) => id !== view?.you)[1] ?? 'p3',
+              tableDx: '22vw',
+              tableDy: '-30vh',
+              handDx: '38vw',
+              handDy: '-32vh',
+              rot: '14deg',
+            },
+          ]
+        : [
+            {
+              pid: view?.you ?? 'p1',
+              tableDx: '18vw',
+              tableDy: '32vh',
+              handDx: '36vw',
+              handDy: '34vh',
+              rot: '-6deg',
+            },
+            {
+              pid: view?.turnOrder.filter((id) => id !== view?.you)[0] ?? 'p2',
+              tableDx: '-22vw',
+              tableDy: '-30vh',
+              handDx: '-38vw',
+              handDy: '-32vh',
+              rot: '-14deg',
+            },
+            {
+              pid: view?.turnOrder.filter((id) => id !== view?.you)[1] ?? 'p3',
+              tableDx: '22vw',
+              tableDy: '-30vh',
+              handDx: '38vw',
+              handDy: '-32vh',
+              rot: '14deg',
+            },
+            {
+              pid: view?.turnOrder.filter((id) => id !== view?.you)[2] ?? 'p4',
+              tableDx: '-22vw',
+              tableDy: '32vh',
+              handDx: '-38vw',
+              handDy: '34vh',
+              rot: '-10deg',
+            },
+          ];
+
+    // 1. Aşama: Her oyuncunun başlangıç yer kartları (1 Köy + 1 Yol)
+    for (const seat of seats) {
+      items.push({
+        kind: 'table',
+        dx: seat.tableDx,
+        dy: seat.tableDy,
+        rot: seat.rot,
+        imgUrl: getBuildingImageUrl('settlement'),
+      });
+      items.push({
+        kind: 'table',
+        dx: seat.tableDx,
+        dy: seat.tableDy,
+        rot: seat.rot,
+        imgUrl: assetUrl('/assets/cards/starting/starting_road_front.png'),
+      });
+    }
+
+    // 2. Aşama: Her oyuncunun elindeki gerçek kart sayısı kadar kaynak kartı (örn. 2 kart varsa 2 kart)
+    const maxHandCount = Math.max(
+      2,
+      ...seats.map((s) => {
+        if (view && s.pid === view.you) {
+          const total = Object.values(view.yourHand ?? {}).reduce((a, b) => a + b, 0);
+          return Math.min(total || 2, 4);
+        }
+        return view?.players[s.pid]?.handCount ?? 2;
+      })
+    );
+
+    for (let round = 0; round < maxHandCount; round++) {
+      for (const seat of seats) {
+        const playerHandCount =
+          view && seat.pid === view.you
+            ? Math.min(
+                Object.values(view.yourHand ?? {}).reduce((a, b) => a + b, 0) || 2,
+                4
+              )
+            : (view?.players[seat.pid]?.handCount ?? 2);
+        if (round < playerHandCount) {
+          items.push({
+            kind: 'hand',
+            dx: seat.handDx,
+            dy: seat.handDy,
+            rot: seat.rot,
+            imgUrl: assetUrl('/assets/cards/resource/resource_back.png'),
+          });
+        }
+      }
+    }
+
+    return items;
+  }, [view, playerCount]);
+
+  const totalTableCards = schedule.filter((item) => item.kind === 'table').length;
+  const totalCards = schedule.length;
+
+  const onTableDealtRef = useRef(onTableCardsDealt);
+  onTableDealtRef.current = onTableCardsDealt;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
+    let tableRevealed = false;
     const interval = setInterval(() => {
       setCardsDealt((prev) => {
         const next = prev + 1;
         cardAudio.playDealOrDraw();
+
+        if (!tableRevealed && next >= totalTableCards) {
+          tableRevealed = true;
+          setTimeout(() => {
+            onTableDealtRef.current?.();
+          }, 420);
+        }
+
         if (next >= totalCards) {
           clearInterval(interval);
           setTimeout(() => {
-            onComplete?.();
-          }, 550);
+            onCompleteRef.current?.();
+          }, 520);
         }
         return next;
       });
-    }, 110); // 110ms aralıkla hızlı ve akıcı uçuş
+    }, 105);
 
     return () => clearInterval(interval);
-  }, [totalCards, onComplete]);
+  }, [totalCards, totalTableCards]);
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
       <CardAnimationStylesInjector />
 
-      {/* Merkez Deste Konumu */}
       <div className="relative perspective-1000 flex items-center justify-center">
-        {/* Uçuş Halindeki Dağıtılan Kartlar */}
-        {Array.from({ length: cardsDealt }).map((_, index) => {
-          const target = targetCoordinates[index % targetCoordinates.length] || {
-            dx: '32vw',
-            dy: '34vh',
-            rot: '0deg',
-            label: 'Senin Elin',
-          };
-          return (
-            <div
-              key={`deal-flight-${index}`}
-              className="absolute rounded-lg overflow-hidden border border-amber-400 shadow-2xl preserve-3d"
-              style={
-                {
-                  width: '64px',
-                  height: '96px',
-                  '--target-x': target.dx,
-                  '--target-y': target.dy,
-                  '--target-rot': target.rot,
-                  animation: 'dealFlightArc 0.65s cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
-                  zIndex: 100 + index,
-                } as React.CSSProperties
-              }
-            >
-              <img
-                src={assetUrl('/assets/cards/resource/resource_back.png')}
-                alt="Dağıtılan Kart"
-                className="w-full h-full object-contain"
-              />
-              <div className="absolute inset-0 bg-linear-to-tr from-amber-500/30 via-transparent to-white/40 pointer-events-none" />
-            </div>
-          );
-        })}
+        {schedule.slice(0, cardsDealt).map((item, index) => (
+          <div
+            key={`deal-flight-${index}`}
+            className="absolute rounded-lg overflow-hidden border border-amber-400 shadow-2xl preserve-3d bg-stone-900"
+            style={
+              {
+                width: '58px',
+                height: '90px',
+                '--target-x': item.dx,
+                '--target-y': item.dy,
+                '--target-rot': item.rot,
+                animation: 'dealFlightArc 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) forwards',
+                zIndex: 100 + index,
+              } as React.CSSProperties
+            }
+          >
+            <img
+              src={item.imgUrl}
+              alt="Dağıtılan Kart"
+              className="w-full h-full object-contain"
+            />
+            <div className="absolute inset-0 bg-linear-to-tr from-amber-500/20 via-transparent to-white/30 pointer-events-none" />
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
 /* ==========================================================================
-   3. KART ÇEKME ANİMASYONU (Draw Card Flight)
+   3. KART ÇEKME ANİMASYONU (Draw Card Flight - Gerçek Başlangıç -> Bitiş Hareketi)
    ========================================================================== */
 export interface DrawCardFlightProps {
   card: FlyingCard;
@@ -353,15 +477,22 @@ export interface DrawCardFlightProps {
 }
 
 export const DrawCardFlight: React.FC<DrawCardFlightProps> = ({ card, onDone }) => {
-  const duration = (card.durationMs ?? 600) / 1000;
+  const [launched, setLaunched] = useState(false);
+  const duration = (card.durationMs ?? 550) / 1000;
   const delay = (card.delayMs ?? 0) / 1000;
 
   useEffect(() => {
-    const totalMs = (card.durationMs ?? 600) + (card.delayMs ?? 0);
+    const raf = requestAnimationFrame(() => {
+      setLaunched(true);
+    });
+    const totalMs = (card.durationMs ?? 550) + (card.delayMs ?? 0);
     const timer = setTimeout(() => {
       onDone?.(card.id);
     }, totalMs);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
   }, [card, onDone]);
 
   return (
@@ -370,21 +501,27 @@ export const DrawCardFlight: React.FC<DrawCardFlightProps> = ({ card, onDone }) 
       style={{
         left: `${card.startX}px`,
         top: `${card.startY}px`,
-        width: '84px',
-        height: '122px',
-        transform: `translate3d(${card.endX - card.startX}px, ${card.endY - card.startY}px, 40px) scale(${card.scale ?? 1}) rotateZ(${card.endRotation ?? 0}deg)`,
-        transition: `transform ${duration}s cubic-bezier(0.18, 0.89, 0.32, 1.28) ${delay}s, opacity 0.2s ease-out ${duration + delay - 0.1}s`,
+        width: '68px',
+        height: '104px',
+        opacity: launched ? 1 : 0,
+        transform: launched
+          ? `translate3d(${card.endX - card.startX}px, ${card.endY - card.startY}px, 30px) scale(${card.scale ?? 0.95}) rotateZ(${card.endRotation ?? -6}deg)`
+          : `translate3d(0px, 0px, 0px) scale(0.75) rotateZ(0deg)`,
+        transition: `transform ${duration}s cubic-bezier(0.2, 0.88, 0.32, 1.12) ${delay}s, opacity 0.15s ease-out ${delay}s`,
         zIndex: 9999,
       }}
     >
-      <div className="relative w-full h-full rounded-xl overflow-hidden border-2 border-amber-400 shadow-[0_12px_28px_rgba(0,0,0,0.65)] bg-slate-900">
+      <div className="relative w-full h-full rounded-lg overflow-hidden border-2 border-amber-400 shadow-[0_12px_28px_rgba(0,0,0,0.65)] bg-slate-900">
         <img
-          src={card.cardImageUrl || card.cardBackUrl || assetUrl('/assets/cards/resource/resource_back.png')}
+          src={
+            card.cardImageUrl ||
+            card.cardBackUrl ||
+            assetUrl('/assets/cards/resource/resource_back.png')
+          }
           alt={card.label || 'Çekilen Kart'}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
-        {/* Hareket parıltısı */}
-        <div className="absolute inset-0 bg-linear-to-tr from-sky-400/25 to-amber-300/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-linear-to-tr from-sky-400/20 to-amber-300/25 pointer-events-none" />
       </div>
     </div>
   );
@@ -417,7 +554,6 @@ export const PlayCardImpact: React.FC<PlayCardImpactProps> = ({ impact, onDone }
         transform: 'translate(-50%, -50%)',
       }}
     >
-      {/* 1. Birincil Halka Dalgası (Primary Shockwave) */}
       <div
         className="absolute rounded-full"
         style={{
@@ -428,7 +564,6 @@ export const PlayCardImpact: React.FC<PlayCardImpactProps> = ({ impact, onDone }
         }}
       />
 
-      {/* 2. İkincil Beyaz Işıma Dalgası */}
       <div
         className="absolute rounded-full"
         style={{
@@ -439,10 +574,8 @@ export const PlayCardImpact: React.FC<PlayCardImpactProps> = ({ impact, onDone }
         }}
       />
 
-      {/* 3. Merkezde Kıvılcım Patlaması */}
       <div className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400/40 blur-md animate-ping" />
 
-      {/* Etiket (Opsiyonel) */}
       {impact.label && (
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-xs font-black text-amber-300 bg-black/80 px-2 py-0.5 rounded border border-amber-500/60 shadow whitespace-nowrap animate-bounce">
           {impact.label}
@@ -562,7 +695,6 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
         onContextMenu={onContextMenu}
         onDoubleClick={onDoubleClick}
       >
-        {/* ARKA YÜZ (Desteden kapalı kayarak gelen yüz - 0deg) */}
         <div
           className="absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 backface-hidden"
           style={{ transform: 'rotateY(0deg)' }}
@@ -575,7 +707,6 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
           />
         </div>
 
-        {/* ÖN YÜZ (3D flip ile açılan bina kartı - 180deg) */}
         <div
           className={`absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 backface-hidden ${
             canAfford
@@ -591,7 +722,6 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
             draggable={false}
           />
 
-          {/* Yeni açıldığında üzerinden geçen ışıma parıltısı (Sheen) */}
           {isReplenishing && (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
@@ -617,19 +747,23 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
 export interface GameOpeningCinematicProps {
   isOpen: boolean;
   view?: PlayerView | null;
+  onTableCardsDealt?: () => void;
   onFinish: () => void;
 }
 
 export const GameOpeningCinematic: React.FC<GameOpeningCinematicProps> = ({
   isOpen,
   view,
+  onTableCardsDealt,
   onFinish,
 }) => {
   if (!isOpen) return null;
 
   return (
     <DealingCardsOverlay
+      view={view}
       playerCount={view?.turnOrder.length || 4}
+      onTableCardsDealt={onTableCardsDealt}
       onComplete={onFinish}
     />
   );
@@ -655,12 +789,10 @@ export const CardAnimationOverlay: React.FC<CardAnimationOverlayProps> = ({
     <>
       <CardAnimationStylesInjector />
 
-      {/* Havada Uçan Kartlar */}
       {flyingCards.map((card) => (
         <DrawCardFlight key={card.id} card={card} onDone={onFlightDone} />
       ))}
 
-      {/* Masa Darbe Halka Efektleri */}
       {impacts.map((impact) => (
         <PlayCardImpact key={impact.id} impact={impact} onDone={onImpactDone} />
       ))}

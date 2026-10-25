@@ -1,6 +1,4 @@
-import React, { useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { FolderOpen, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   getBonusImageUrl,
   getBuildingImageUrl,
@@ -22,12 +20,14 @@ export interface TableCardProps {
   isStarting?: boolean;
   /** Boyutlandırma çarpanı */
   scale?: number;
-  /** Kart taban genişliği (varsayılan: 125px dikey, 160px bonus yatay) */
+  /** Kart taban genişliği (varsayılan: 125px dikey, 186px bonus yatay) */
   baseWidth?: number;
-  /** Kart taban yüksekliği (varsayılan: 186px dikey, 108px bonus yatay) */
+  /** Kart taban yüksekliği (varsayılan: 194px dikey, 120px bonus yatay) */
   baseHeight?: number;
-  /** Sadece kart başlığının göründüğü, tıklanınca klasör penceresi olarak açılan mod */
+  /** Sadece kart başlığının göründüğü, tıklanınca masanın üstünde kayarak açılan çekmece modu */
   folderMode?: boolean;
+  /** Çekmecenin masa üstünde kayma yönü ('up': alt oyuncular için yukarı, 'down': üst rakipler için aşağı) */
+  drawerDirection?: 'up' | 'down';
   className?: string;
   /** Kart inceleme modalı tetikleyicisi */
   onInspect?: (type: any, subKind?: any) => void;
@@ -57,6 +57,7 @@ export const TableCard: React.FC<TableCardProps> = ({
   baseWidth,
   baseHeight,
   folderMode = false,
+  drawerDirection = 'up',
   className = '',
   onInspect,
   isDraggable = false,
@@ -87,12 +88,12 @@ export const TableCard: React.FC<TableCardProps> = ({
   }
 
   const cardW = folderMode && isBonus
-    ? Math.round(145 * scale)
+    ? Math.round(125 * scale)
     : Math.round(effectiveBaseWidth * scale);
   const fullBonusH = Math.round(cardW / (186 / 120));
-  const cardH = folderMode
-    ? Math.max(18, Math.round(194 * scale * 0.24))
-    : Math.round(effectiveBaseHeight * scale);
+  const fullCardH = isBonus ? fullBonusH : Math.round(effectiveBaseHeight * scale);
+  const closedDrawerH = Math.max(18, Math.round(194 * scale * 0.24));
+  const cardH = folderMode ? closedDrawerH : fullCardH;
 
   // Kart görselini belirle (Tüm kartlar orijinal tam kart görseliyle render edilir)
   const getImageUrl = (): string => {
@@ -122,6 +123,18 @@ export const TableCard: React.FC<TableCardProps> = ({
   const initialRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef<boolean>(false);
+
+  // Dışarıya tıklandığında açık çekmeceyi kapat
+  useEffect(() => {
+    if (!folderMode || !isFolderOpen) return;
+    const handleDocClick = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setIsFolderOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleDocClick);
+    return () => document.removeEventListener('pointerdown', handleDocClick);
+  }, [folderMode, isFolderOpen]);
 
   if (!isDragging) {
     initialPosRef.current = { x: position?.x ?? 0, y: position?.y ?? 0 };
@@ -300,7 +313,7 @@ export const TableCard: React.FC<TableCardProps> = ({
     }
     e.stopPropagation();
     if (folderMode) {
-      setIsFolderOpen(true);
+      setIsFolderOpen((prev) => !prev);
       return;
     }
     // Sabit kartlarda (rakip kartları veya masaüstü inceleme) doğrudan detay açılır
@@ -312,7 +325,7 @@ export const TableCard: React.FC<TableCardProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     if (folderMode) {
-      setIsFolderOpen(true);
+      setIsFolderOpen((prev) => !prev);
     } else {
       onInspect?.(type);
     }
@@ -323,8 +336,6 @@ export const TableCard: React.FC<TableCardProps> = ({
     if (isDraggable) {
       // Çift tıklandığında konumu orijinal yerine sıfırla
       onPositionChange?.({ x: 0, y: 0 });
-    } else if (folderMode) {
-      setIsFolderOpen(true);
     } else {
       onInspect?.(type);
     }
@@ -338,123 +349,80 @@ export const TableCard: React.FC<TableCardProps> = ({
     ? `translate3d(${currentX}px, ${currentY}px, 0)`
     : undefined;
 
-  const folderTitle =
-    type === 'longest_route'
-      ? 'En Uzun Yol (+2 ZP)'
-      : type === 'largest_army'
-      ? 'En Güçlü Ordu (+2 ZP)'
-      : type === 'road'
-      ? 'Yol Kartı'
-      : 'Şövalye Kartı';
+  const isExpandedInPlace = folderMode && isFolderOpen;
 
   return (
-    <>
-      <div
-        ref={cardRef}
-        id={id}
-        onClick={handleClick}
-        onContextMenu={handleContextMenu}
-        onDoubleClick={handleDoubleClick}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        style={{
-          width: `${cardW}px`,
-          height: `${cardH}px`,
-          transform: transformStyle,
-          transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
-          zIndex: isDragging ? 100 : (zIndex ?? (hasCustomPos ? 5 : 1)),
-          touchAction: isDraggable ? 'none' : 'auto',
-        }}
-        className={`relative select-none ${
-          folderMode ? 'rounded-t-md' : 'rounded-md sm:rounded-lg'
-        } overflow-hidden shadow-lg border border-black/40 bg-stone-900 transition-shadow ${
-          isDragging
-            ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
-            : isDraggable
-            ? 'cursor-grab hover:scale-[1.02] hover:shadow-2xl'
-            : 'cursor-pointer hover:scale-[1.03] active:scale-95 hover:shadow-xl'
-        } ${className}`}
-      >
-        {folderMode && isBonus ? (
-          <>
-            <img
-              src={getImageUrl()}
-              alt={type}
-              style={{
-                width: `${cardW}px`,
-                height: `${fullBonusH}px`,
-                marginTop: `-${Math.round(fullBonusH * 0.45)}px`,
-              }}
-              className="object-contain pointer-events-none select-none"
-              draggable={false}
-            />
-            <div className="absolute bottom-0 inset-x-0 h-[3px] rounded-b-sm bg-gradient-to-r from-amber-700/90 via-amber-400/90 to-amber-700/90 border-t border-black/50 pointer-events-none" />
-          </>
-        ) : (
+    <div
+      ref={cardRef}
+      id={id}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      style={{
+        width: `${cardW}px`,
+        height: `${cardH}px`,
+        transform: transformStyle,
+        transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+        zIndex: isDragging
+          ? 100
+          : isExpandedInPlace
+          ? 45
+          : zIndex ?? (hasCustomPos ? 5 : 1),
+        touchAction: isDraggable ? 'none' : 'auto',
+      }}
+      className={`relative select-none ${
+        !folderMode ? 'rounded-md sm:rounded-lg overflow-hidden shadow-lg border border-black/40 bg-stone-900' : ''
+      } transition-shadow ${
+        isDragging
+          ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
+          : isDraggable
+          ? 'cursor-grab hover:scale-[1.02] hover:shadow-2xl'
+          : 'cursor-pointer active:scale-95'
+      } ${className}`}
+    >
+      {folderMode ? (
+        <div
+          style={{
+            width: `${cardW}px`,
+            height: `${isExpandedInPlace ? fullCardH : closedDrawerH}px`,
+            ...(drawerDirection === 'down' ? { top: 0 } : { bottom: 0 }),
+            left: 0,
+          }}
+          className={`absolute ${
+            isExpandedInPlace ? 'rounded-md border-amber-400/70 shadow-xl' : 'rounded-t-md border-black/45 shadow-md'
+          } overflow-hidden border bg-stone-900 transition-all duration-200 ease-out`}
+        >
           <img
             src={getImageUrl()}
             alt={type}
-            className="w-full h-full object-contain pointer-events-none"
+            style={{
+              width: `${cardW}px`,
+              height: `${fullCardH}px`,
+              marginTop:
+                isBonus && !isExpandedInPlace
+                  ? `-${Math.round(fullBonusH * 0.45)}px`
+                  : '0px',
+            }}
+            className="object-contain object-top pointer-events-none select-none transition-all duration-200 ease-out"
             draggable={false}
           />
-        )}
-      </div>
-
-      {/* KLASÖR AÇILIR PENCERE (Tıklandığında tam kartı gösterir) */}
-      {folderMode &&
-        isFolderOpen &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 animate-in fade-in duration-150 select-none"
-            onClick={() => setIsFolderOpen(false)}
-          >
-            <div
-              className="relative bg-slate-950/95 border-2 border-amber-500/60 rounded-2xl p-3 sm:p-4 shadow-2xl max-w-[92vw] max-h-[88dvh] flex flex-col gap-2.5 animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-1.5">
-                <div className="flex items-center gap-2 text-amber-300 font-black text-xs sm:text-sm">
-                  <FolderOpen size={16} className="text-amber-400" />
-                  <span>{folderTitle}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFolderOpen(false)}
-                  className="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-1 rounded-lg transition"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-center py-1 px-1">
-                <div
-                  onClick={() => {
-                    setIsFolderOpen(false);
-                    onInspect?.(type);
-                  }}
-                  style={
-                    isBonus
-                      ? { width: '230px', height: '148px' }
-                      : { width: '115px', height: '178px' }
-                  }
-                  className="shrink-0 rounded-lg overflow-hidden border border-amber-400/50 shadow-xl cursor-pointer hover:scale-105 transition-transform bg-stone-900"
-                >
-                  <img
-                    src={getImageUrl()}
-                    alt={type}
-                    className="w-full h-full object-contain pointer-events-none"
-                    draggable={false}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-    </>
+          {!isExpandedInPlace && (
+            <div className="absolute bottom-0 inset-x-0 h-[3px] rounded-b-sm bg-gradient-to-r from-amber-700/90 via-amber-400/90 to-amber-700/90 border-t border-black/50 pointer-events-none" />
+          )}
+        </div>
+      ) : (
+        <img
+          src={getImageUrl()}
+          alt={type}
+          className="w-full h-full object-contain pointer-events-none"
+          draggable={false}
+        />
+      )}
+    </div>
   );
 };
 

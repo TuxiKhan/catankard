@@ -1,6 +1,4 @@
-import React, { useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { FolderOpen, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { TableCardType } from './TableCard.tsx';
 import { TableCard, type CardPosition } from './TableCard.tsx';
 import { getBuildingImageUrl } from '../lib/cardImages.ts';
@@ -15,8 +13,10 @@ export interface StackedTableCardsProps {
   baseWidth?: number;
   baseHeight?: number;
   layerOffset?: number;
-  /** Sadece kart başlıklarının göründüğü, tıklanınca klasör penceresi olarak açılan mod */
+  /** Sadece kart başlıklarının göründüğü, tıklanınca masanın üstünde kayarak açılan çekmece modu */
   folderMode?: boolean;
+  /** Çekmecenin masa üstünde kayma yönü ('up': alt oyuncular için yukarı, 'down': üst rakipler için aşağı) */
+  drawerDirection?: 'up' | 'down';
   className?: string;
   onInspect?: (type: any, subKind?: any) => void;
   isDraggable?: boolean;
@@ -33,7 +33,7 @@ export interface StackedTableCardsProps {
  * Aynı türdeki birden fazla masa kartını (Yol veya Şövalye)
  * üst başlığı (YOL / ŞÖVALYE) görünecek şekilde dikey basamaklı istifler.
  * `folderMode` aktifken masada yalnızca kartların üst başlık şeritleri görünür;
- * üzerine tıklanana kadar kapalı klasör gibi durur, tıklandığında klasör penceresi açılır.
+ * üzerine tıklanınca ekstra bir pencere açmadan doğrudan masanın üstünde kayarak açılır ve kapanır.
  */
 export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
   idPrefix,
@@ -44,6 +44,7 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
   baseHeight = 194,
   layerOffset = 30,
   folderMode = false,
+  drawerDirection = 'up',
   className = '',
   onInspect,
   isDraggable = false,
@@ -65,29 +66,43 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
   const justDraggedRef = useRef<boolean>(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const initialRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef<boolean>(false);
+
+  // Dışarıya tıklandığında açık çekmeceyi kapat
+  useEffect(() => {
+    if (!folderMode || !isFolderOpen) return;
+    const handleDocClick = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setIsFolderOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleDocClick);
+    return () => document.removeEventListener('pointerdown', handleDocClick);
+  }, [folderMode, isFolderOpen]);
 
   if (count <= 0) return null;
 
   const cardW = Math.round(baseWidth * scale);
   const cardH = Math.round(baseHeight * scale);
 
-  // Kapalı klasör modunda yalnızca başlık şeritleri gözükür
+  // Kapalı çekmece modunda yalnızca başlık şeritleri gözükür
   const topHeaderH = Math.max(18, Math.round(cardH * 0.24));
   const folderStepH =
     count > 1
       ? Math.min(
-          Math.max(10, Math.round(cardH * 0.16)),
-          Math.max(7, Math.floor(Math.round(cardH * 0.42) / (count - 1)))
+          Math.max(8, Math.round(cardH * 0.14)),
+          Math.max(5, Math.floor(Math.round(cardH * 0.34) / (count - 1)))
         )
       : 0;
   const folderTotalH = topHeaderH + (count - 1) * folderStepH;
 
-  // Normal modda dikey basamak yüksekliği
-  const maxExtraH = Math.round(64 * scale);
+  // Normal modda ve açık çekmece modunda dikey basamak yüksekliği (marketi kapatmaması için sınırlandırılmış)
+  const maxExtraH = Math.round((folderMode ? 36 : 48) * scale);
   const rawOffset = Math.round(layerOffset * scale);
   const offset =
     count > 1
-      ? Math.min(rawOffset, Math.max(Math.round(8 * scale), Math.floor(maxExtraH / (count - 1))))
+      ? Math.min(rawOffset, Math.max(Math.round(6 * scale), Math.floor(maxExtraH / (count - 1))))
       : 0;
   const normalTotalH = cardH + (count - 1) * offset;
 
@@ -122,8 +137,22 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     onBringToFront?.();
+    longPressFiredRef.current = false;
     dragStartRef.current = { x: e.clientX, y: e.clientY };
     justDraggedRef.current = false;
+
+    if (onInspect) {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = window.setTimeout(() => {
+        if (!justDraggedRef.current) {
+          longPressFiredRef.current = true;
+          try {
+            navigator.vibrate?.(40);
+          } catch {}
+          onInspect(type);
+        }
+      }, 400);
+    }
 
     if (!isDraggable) return;
     if (e.button !== 0) return;
@@ -147,6 +176,12 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
     const dy = e.clientY - dragStartRef.current.y;
     const dist = Math.hypot(dx, dy);
 
+    if (dist > 8 && longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (longPressFiredRef.current) return;
     if (!isDraggable) return;
 
     if (!isDragging && dist > 6) {
@@ -181,6 +216,11 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
     if (isDragging) {
       try {
         (cardRef.current ?? e.currentTarget).releasePointerCapture(e.pointerId);
@@ -211,10 +251,16 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
 
     setTimeout(() => {
       justDraggedRef.current = false;
+      longPressFiredRef.current = false;
     }, 120);
   };
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
     if (isDragging) {
       try {
         (cardRef.current ?? e.currentTarget).releasePointerCapture(e.pointerId);
@@ -226,16 +272,17 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
     initialRectRef.current = null;
     setDragOffset({ x: 0, y: 0 });
     justDraggedRef.current = false;
+    longPressFiredRef.current = false;
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (justDraggedRef.current) {
+    if (justDraggedRef.current || longPressFiredRef.current) {
       e.stopPropagation();
       return;
     }
     e.stopPropagation();
     if (folderMode) {
-      setIsFolderOpen(true);
+      setIsFolderOpen((prev) => !prev);
     } else {
       onInspect?.(type);
     }
@@ -249,164 +296,136 @@ export const StackedTableCards: React.FC<StackedTableCardsProps> = ({
     ? `translate3d(${currentX}px, ${currentY}px, 0)`
     : undefined;
 
-  const folderTitle = type === 'road' ? 'Yol İstifi' : 'Şövalye İstifi';
+  const isExpandedInPlace = folderMode && isFolderOpen;
 
   return (
-    <>
-      <div
-        ref={cardRef}
-        onClick={handleClick}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          if (folderMode) {
-            setIsFolderOpen(true);
-          } else {
-            onInspect?.(type);
-          }
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        style={{
-          width: `${cardW}px`,
-          height: `${totalH}px`,
-          transform: transformStyle,
-          transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
-          zIndex: isDragging ? 100 : (zIndex ?? (hasCustomPos ? 5 : 1)),
-          touchAction: isDraggable ? 'none' : 'auto',
-        }}
-        className={`relative select-none ${
-          isDragging
-            ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
-            : isDraggable
-            ? 'cursor-grab hover:scale-[1.02]'
-            : 'cursor-pointer hover:scale-[1.03] active:scale-95'
-        } ${className}`}
-      >
-        {folderMode ? (
-          <>
-            {Array.from({ length: count }).map((_, i) => {
-              const isTop = i === count - 1;
-              const topPx = i * folderStepH;
-              const sliceH = isTop ? topHeaderH : folderStepH + 4;
-
-              return (
-                <div
-                  key={`${idPrefix}-folder-${i}`}
-                  style={{
-                    width: `${cardW}px`,
-                    height: `${sliceH}px`,
-                    top: `${topPx}px`,
-                    left: 0,
-                    zIndex: i + 1,
-                  }}
-                  className="absolute rounded-t-md overflow-hidden border border-black/45 shadow-md bg-stone-900"
-                >
-                  <img
-                    src={getCardImageUrl(i)}
-                    alt={type === 'road' ? 'Yol' : 'Şövalye'}
-                    style={{
-                      width: `${cardW}px`,
-                      height: `${cardH}px`,
-                    }}
-                    className="object-contain object-top pointer-events-none select-none"
-                    draggable={false}
-                  />
-                </div>
-              );
-            })}
-            {/* Klasör alt dudak çizgisi */}
-            <div
-              style={{ zIndex: count + 2 }}
-              className="absolute bottom-0 inset-x-0 h-[3px] rounded-b-sm bg-gradient-to-r from-amber-700/90 via-amber-400/90 to-amber-700/90 border-t border-black/50 pointer-events-none"
-            />
-          </>
-        ) : (
-          Array.from({ length: count }).map((_, i) => {
-            const topPx = i * offset;
+    <div
+      ref={cardRef}
+      onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (folderMode) {
+          setIsFolderOpen((prev) => !prev);
+        } else {
+          onInspect?.(type);
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onInspect?.(type);
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      style={{
+        width: `${cardW}px`,
+        height: `${totalH}px`,
+        transform: transformStyle,
+        transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
+        zIndex: isDragging
+          ? 100
+          : isExpandedInPlace
+          ? 45
+          : zIndex ?? (hasCustomPos ? 5 : 1),
+        touchAction: isDraggable ? 'none' : 'auto',
+      }}
+      className={`relative select-none ${
+        isDragging
+          ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
+          : isDraggable
+          ? 'cursor-grab hover:scale-[1.02]'
+          : 'cursor-pointer active:scale-95'
+      } ${className}`}
+    >
+      {folderMode ? (
+        <div
+          style={{
+            width: `${cardW}px`,
+            height: `${isExpandedInPlace ? normalTotalH : folderTotalH}px`,
+            ...(drawerDirection === 'down' ? { top: 0 } : { bottom: 0 }),
+            left: 0,
+          }}
+          className="absolute transition-all duration-200 ease-out"
+        >
+          {Array.from({ length: count }).map((_, i) => {
+            const isTop = i === count - 1;
+            const topPx = isExpandedInPlace ? i * offset : i * folderStepH;
+            const sliceH = isExpandedInPlace
+              ? cardH
+              : isTop
+              ? topHeaderH
+              : folderStepH + 4;
 
             return (
               <div
-                key={`${idPrefix}-${i}`}
+                key={`${idPrefix}-folder-${i}`}
                 style={{
                   width: `${cardW}px`,
-                  height: `${cardH}px`,
+                  height: `${sliceH}px`,
                   top: `${topPx}px`,
                   left: 0,
                   zIndex: i + 1,
                 }}
-                className="absolute rounded-md overflow-hidden border border-black/35 shadow-md bg-stone-900"
+                className={`absolute ${
+                  isExpandedInPlace ? 'rounded-md' : 'rounded-t-md'
+                } overflow-hidden border shadow-md bg-stone-900 transition-all duration-200 ease-out ${
+                  isExpandedInPlace
+                    ? 'border-amber-400/70 shadow-xl'
+                    : 'border-black/45'
+                }`}
               >
-                <TableCard
-                  id={`${idPrefix}-${i}`}
-                  type={type}
-                  isStarting={i === 0 && type === 'road'}
-                  scale={scale}
-                  baseWidth={baseWidth}
-                  baseHeight={baseHeight}
-                  isDraggable={false}
-                  onInspect={() => onInspect?.(type)}
+                <img
+                  src={getCardImageUrl(i)}
+                  alt={type === 'road' ? 'Yol' : 'Şövalye'}
+                  style={{
+                    width: `${cardW}px`,
+                    height: `${cardH}px`,
+                  }}
+                  className="object-contain object-top pointer-events-none select-none"
+                  draggable={false}
                 />
               </div>
             );
-          })
-        )}
-      </div>
-
-      {/* KLASÖR AÇILIR PENCERE (Tıklandığında tam kartları gösterir) */}
-      {folderMode &&
-        isFolderOpen &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 animate-in fade-in duration-150 select-none"
-            onClick={() => setIsFolderOpen(false)}
-          >
+          })}
+          {/* Çekmece kapalıyken alt dudak çizgisi */}
+          {!isExpandedInPlace && (
             <div
-              className="relative bg-slate-950/95 border-2 border-amber-500/60 rounded-2xl p-3 sm:p-4 shadow-2xl max-w-[92vw] max-h-[88dvh] flex flex-col gap-2.5 animate-in zoom-in-95 duration-150"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Klasör Başlığı */}
-              <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-1.5">
-                <div className="flex items-center gap-2 text-amber-300 font-black text-xs sm:text-sm">
-                  <FolderOpen size={16} className="text-amber-400" />
-                  <span>{folderTitle}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsFolderOpen(false)}
-                  className="text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 p-1 rounded-lg transition"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              style={{ zIndex: count + 2 }}
+              className="absolute bottom-0 inset-x-0 h-[3px] rounded-b-sm bg-gradient-to-r from-amber-700/90 via-amber-400/90 to-amber-700/90 border-t border-black/50 pointer-events-none"
+            />
+          )}
+        </div>
+      ) : (
+        Array.from({ length: count }).map((_, i) => {
+          const topPx = i * offset;
 
-              {/* Klasör İçindeki Tam Kartlar */}
-              <div className="flex items-center gap-2.5 overflow-x-auto py-1 px-1 scrollbar-thin scrollbar-thumb-white/20">
-                {Array.from({ length: count }).map((_, i) => (
-                  <div
-                    key={`${idPrefix}-open-${i}`}
-                    onClick={() => {
-                      setIsFolderOpen(false);
-                      onInspect?.(type);
-                    }}
-                    style={{ width: '115px', height: '178px' }}
-                    className="shrink-0 rounded-lg overflow-hidden border border-amber-400/50 shadow-xl cursor-pointer hover:scale-105 transition-transform bg-stone-900"
-                  >
-                    <img
-                      src={getCardImageUrl(i)}
-                      alt={type === 'road' ? 'Yol' : 'Şövalye'}
-                      className="w-full h-full object-contain pointer-events-none"
-                      draggable={false}
-                    />
-                  </div>
-                ))}
-              </div>
+          return (
+            <div
+              key={`${idPrefix}-${i}`}
+              style={{
+                width: `${cardW}px`,
+                height: `${cardH}px`,
+                top: `${topPx}px`,
+                left: 0,
+                zIndex: i + 1,
+              }}
+              className="absolute rounded-md overflow-hidden border border-black/35 shadow-md bg-stone-900"
+            >
+              <TableCard
+                id={`${idPrefix}-${i}`}
+                type={type}
+                isStarting={i === 0 && type === 'road'}
+                scale={scale}
+                baseWidth={baseWidth}
+                baseHeight={baseHeight}
+                isDraggable={false}
+                onInspect={() => onInspect?.(type)}
+              />
             </div>
-          </div>,
-          document.body
-        )}
-    </>
+          );
+        })
+      )}
+    </div>
   );
 };

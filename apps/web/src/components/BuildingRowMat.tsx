@@ -27,7 +27,21 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   scale = 1,
 }) => {
   const [browsingDeck, setBrowsingDeck] = useState<DeckType | null>(null);
+  const [deckToast, setDeckToast] = useState<{
+    deck: DeckType;
+    label: string;
+    count: number;
+  } | null>(null);
+  const deckToastTimerRef = useRef<number | null>(null);
   const { isReplenishing } = useReplenishDetector(view.buildingRow);
+
+  const showDeckCountPopup = (deck: DeckType, label: string, count: number) => {
+    if (deckToastTimerRef.current) clearTimeout(deckToastTimerRef.current);
+    setDeckToast({ deck, label, count });
+    deckToastTimerRef.current = window.setTimeout(() => {
+      setDeckToast(null);
+    }, 1800);
+  };
 
   const isActive = view.activePlayerId === view.you && view.phase === 'action';
   const roads = view.players[view.you]?.area?.roads ?? 0;
@@ -127,13 +141,22 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
 
   const renderResourceDeck = () => (
     <div
-      className="flex flex-col items-center gap-1 group cursor-pointer shrink-0"
-      onClick={() => setBrowsingDeck('resource')}
+      className="relative flex flex-col items-center gap-1 group cursor-pointer shrink-0"
+      onClick={() => {
+        showDeckCountPopup('resource', 'Kaynak Destesi', view.resourceDeckCount);
+        setBrowsingDeck('resource');
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
+        showDeckCountPopup('resource', 'Kaynak Destesi', view.resourceDeckCount);
         setBrowsingDeck('resource');
       }}
     >
+      {deckToast?.deck === 'resource' && (
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-amber-400 text-amber-300 text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          {deckToast.count} Kart
+        </div>
+      )}
       <div
         style={{ width: `${deckW}px`, height: `${deckH}px` }}
         className="relative rounded-md sm:rounded-lg overflow-hidden border border-amber-800/80 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-amber-900/60 bg-amber-950"
@@ -145,22 +168,28 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           className="w-full h-full object-contain"
           draggable={false}
         />
-        <div className="absolute bottom-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-amber-600/40 pointer-events-none">
-          {view.resourceDeckCount}
-        </div>
       </div>
     </div>
   );
 
   const renderEventDeck = () => (
     <div
-      className="flex flex-col items-center gap-1 group cursor-pointer shrink-0"
-      onClick={() => setBrowsingDeck('event')}
+      className="relative flex flex-col items-center gap-1 group cursor-pointer shrink-0"
+      onClick={() => {
+        showDeckCountPopup('event', 'Olay Destesi', view.eventDeckCount);
+        setBrowsingDeck('event');
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
+        showDeckCountPopup('event', 'Olay Destesi', view.eventDeckCount);
         setBrowsingDeck('event');
       }}
     >
+      {deckToast?.deck === 'event' && (
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-slate-400 text-slate-200 text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          {deckToast.count} Kart
+        </div>
+      )}
       <div
         style={{ width: `${deckW}px`, height: `${deckH}px` }}
         className="relative rounded-md sm:rounded-lg overflow-hidden border border-slate-700 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-slate-800 bg-slate-950"
@@ -172,38 +201,50 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           className="w-full h-full object-contain"
           draggable={false}
         />
-        <div className="absolute bottom-1 right-1 bg-black/85 text-slate-200 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-slate-500/40 pointer-events-none">
-          {view.eventDeckCount}
-        </div>
       </div>
     </div>
   );
 
   const renderBuildingDeck = () => (
     <div
-      className="relative rounded-lg sm:rounded-xl overflow-hidden border border-emerald-600/70 shadow-lg cursor-pointer group transition-transform hover:-translate-y-0.5 bg-emerald-950 shrink-0"
-      style={{ width: `${deckW}px`, height: `${deckH}px` }}
-      onClick={() => setBrowsingDeck('building')}
+      className="relative flex flex-col items-center shrink-0"
+      onClick={() => {
+        showDeckCountPopup('building', 'İnşaat Destesi', view.buildingDeckCount);
+        setBrowsingDeck('building');
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
+        showDeckCountPopup('building', 'İnşaat Destesi', view.buildingDeckCount);
         setBrowsingDeck('building');
       }}
     >
-      <div className="absolute inset-0 bg-emerald-950/60 rounded-md sm:rounded-lg translate-x-0.5 translate-y-0.5 -z-10" />
-      <img
-        src={assetUrl('/assets/cards/building/building_back.png')}
-        alt="İnşaat Kartı Destesi"
-        className="w-full h-full object-contain"
-        draggable={false}
-      />
-      <div className="absolute bottom-1 right-1 bg-black/85 text-emerald-300 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-emerald-500/40 pointer-events-none">
-        {view.buildingDeckCount}
+      {deckToast?.deck === 'building' && (
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-emerald-400 text-emerald-300 text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          {deckToast.count} Kart
+        </div>
+      )}
+      <div
+        className="relative rounded-lg sm:rounded-xl overflow-hidden border border-emerald-600/70 shadow-lg cursor-pointer group transition-transform hover:-translate-y-0.5 bg-emerald-950 shrink-0"
+        style={{ width: `${deckW}px`, height: `${deckH}px` }}
+      >
+        <div className="absolute inset-0 bg-emerald-950/60 rounded-md sm:rounded-lg translate-x-0.5 translate-y-0.5 -z-10" />
+        <img
+          src={assetUrl('/assets/cards/building/building_back.png')}
+          alt="İnşaat Kartı Destesi"
+          className="w-full h-full object-contain"
+          draggable={false}
+        />
       </div>
     </div>
   );
 
   const renderMetropolisStack = () => (
-    <div className="flex flex-col items-center gap-1 shrink-0">
+    <div className="relative flex flex-col items-center gap-1 shrink-0">
+      {deckToast?.deck === 'metropolis' && (
+        <div className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-yellow-400 text-yellow-300 text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+          {deckToast.count} Kart
+        </div>
+      )}
       <div
         className={`relative rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 select-none ${
           canBuildMetro
@@ -220,15 +261,18 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           if (canBuildMetro && topMetro) {
             onSelectBuild(topMetro, 'metropolis');
           } else {
+            showDeckCountPopup('metropolis', 'Büyükşehir Destesi', view.metropolisStack.length);
             setBrowsingDeck('metropolis');
           }
         }}
         onContextMenu={(e) => {
           e.preventDefault();
+          showDeckCountPopup('metropolis', 'Büyükşehir Destesi', view.metropolisStack.length);
           setBrowsingDeck('metropolis');
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
+          showDeckCountPopup('metropolis', 'Büyükşehir Destesi', view.metropolisStack.length);
           setBrowsingDeck('metropolis');
         }}
       >
@@ -244,9 +288,6 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             Tükendi
           </div>
         )}
-        <div className="absolute top-1 right-1 bg-yellow-500 text-slate-950 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow pointer-events-none">
-          x{view.metropolisStack.length}
-        </div>
       </div>
     </div>
   );
@@ -422,6 +463,17 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
         deckType={browsingDeck}
         onClose={() => setBrowsingDeck(null)}
         metropolisSide={view.config.metropolisSide}
+        remainingCount={
+          browsingDeck === 'resource'
+            ? view.resourceDeckCount
+            : browsingDeck === 'event'
+            ? view.eventDeckCount
+            : browsingDeck === 'building'
+            ? view.buildingDeckCount
+            : browsingDeck === 'metropolis'
+            ? view.metropolisStack.length
+            : undefined
+        }
       />
     </>
   );

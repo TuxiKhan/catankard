@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
-import { CardStack, groupSettlementStacks } from './CardStack.tsx';
+import { CardStack } from './CardStack.tsx';
 import { TableCard } from './TableCard.tsx';
 import { StackedTableCards } from './StackedTableCards.tsx';
 import { FannedHand } from './FannedHand.tsx';
@@ -36,6 +36,7 @@ const formatRemainingTime = (seconds: number): string => {
 interface GameDesk4PProps {
   roomId?: string | null;
   view: PlayerView;
+  isTableVisible?: boolean;
   onInspectCard: (type: any, subKind?: any) => void;
   onOpenTrade: () => void;
   onEndTurn: () => Promise<void>;
@@ -51,6 +52,7 @@ interface GameDesk4PProps {
 export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   roomId,
   view,
+  isTableVisible = true,
   onInspectCard,
   onOpenTrade,
   onEndTurn,
@@ -77,7 +79,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   const {
     isMobile,
     isMobilePortrait,
-    isMobileLandscape,
     marketScale,
     opponentCardScale,
     opponentHandScale,
@@ -87,7 +88,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
-  // Masadaki tüm kartların serbestçe sürüklenip bırakılması ve canlı senkronizasyonu
   const {
     positions: cardPositions,
     positionsByPlayer,
@@ -104,7 +104,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   const [, setIsCardDragging] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Kart Uçuş ve Masa Darbe Animasyonları
   const {
     flyingCards,
     impacts,
@@ -112,31 +111,51 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     spawnImpact,
   } = useCardAnimations();
 
-  // Oyun Başlangıç Açılış Sinematiği (Kart karılması & dağıtımı)
-  const [showOpeningCinematic, setShowOpeningCinematic] = useState<boolean>(() => {
-    return view.turnNumber === 1 && !sessionStorage.getItem(`catankard_opened_${view.turnOrder.join('_')}`);
+  const openingStorageKey = `catankard_opened_${view.turnOrder.join('_')}`;
+  const [needsOpeningDeal] = useState<boolean>(() => {
+    return view.turnNumber === 1 && !sessionStorage.getItem(openingStorageKey);
   });
+  const [showOpeningCinematic, setShowOpeningCinematic] = useState<boolean>(false);
+  const [tableCardsDealt, setTableCardsDealt] = useState<boolean>(() => !needsOpeningDeal);
+  const [handCardsDealt, setHandCardsDealt] = useState<boolean>(() => !needsOpeningDeal);
+
+  // Kullanıcı yatay çevirip masayı gördükten sonra kart dağıtma animasyonunu başlat
+  useEffect(() => {
+    if (!needsOpeningDeal) return;
+    if (!isTableVisible) return;
+
+    const timer = window.setTimeout(() => {
+      setShowOpeningCinematic(true);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [needsOpeningDeal, isTableVisible]);
 
   const handleFinishOpening = () => {
-    sessionStorage.setItem(`catankard_opened_${view.turnOrder.join('_')}`, '1');
+    sessionStorage.setItem(openingStorageKey, '1');
+    setTableCardsDealt(true);
+    setHandCardsDealt(true);
     setShowOpeningCinematic(false);
   };
 
-  // Log Akışından Otomatik Animasyon Tetikleme (Hasat kart çekimi & İnşa etme darbeleri)
+  // Log Akışından Otomatik Animasyon Tetikleme (Her çekilen kart için birebir kart uçuşu)
   useLogAnimationListener({
     recentLog: view.recentLog,
     youPlayerId: view.you,
-    onDrawCard: (pid) => {
+    onDrawCard: (pid, count) => {
       const isMe = pid === view.you;
-      spawnFlight({
-        startX: window.innerWidth * 0.38,
-        startY: window.innerHeight * 0.5,
-        endX: isMe ? window.innerWidth * 0.75 : window.innerWidth * 0.25,
-        endY: isMe ? window.innerHeight * 0.82 : window.innerHeight * 0.22,
-        scale: 0.95,
-        durationMs: 580,
-        cardBackUrl: assetUrl('/assets/cards/resource/resource_back.png'),
-      });
+      const cardsToAnimate = Math.max(1, Math.min(count || 1, 6));
+      for (let i = 0; i < cardsToAnimate; i++) {
+        spawnFlight({
+          startX: window.innerWidth * 0.2,
+          startY: window.innerHeight * 0.5,
+          endX: isMe ? window.innerWidth * 0.85 : window.innerWidth * 0.25,
+          endY: isMe ? window.innerHeight * 0.82 : window.innerHeight * 0.22,
+          scale: 0.92,
+          durationMs: 520,
+          delayMs: i * 140,
+          cardBackUrl: assetUrl('/assets/cards/resource/resource_back.png'),
+        });
+      }
     },
     onPlayCard: (pid, cardType) => {
       const isMe = pid === view.you;
@@ -155,7 +174,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   const opp2 = opponents[1]; // Sağ Üst Kadran
   const opp3 = opponents[2]; // Sol Alt Kadran
 
-  // Canlı Geri Sayım (turnDeadline bazlı 1s interval ile güncellenir)
   const calculateRemaining = () => {
     return view.turnDeadline
       ? Math.max(0, Math.round((view.turnDeadline - Date.now()) / 1000))
@@ -166,22 +184,12 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
   useEffect(() => {
     setRemainingSeconds(calculateRemaining());
-
     if (!view.turnDeadline) return;
-
     const interval = setInterval(() => {
       setRemainingSeconds(calculateRemaining());
     }, 1000);
-
     return () => clearInterval(interval);
   }, [view.turnDeadline, view.activePlayerId]);
-
-  // Aktif oyuncu kendisi ise ve süre 10 saniye veya daha azsa uyarı ver
-  const isTimeWarning =
-    view.activePlayerId === view.you &&
-    remainingSeconds !== null &&
-    remainingSeconds <= 10 &&
-    remainingSeconds > 0;
 
   const executeBuildWithSubstitution = async (
     card: BuildingCard | MetropolisCard,
@@ -277,7 +285,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     }
   };
 
-  // Aktif Oyuncunun Bilgileri
   const youPlayer = view.players[view.you];
   const youArea = youPlayer?.area;
   const youRoadsCount = Math.max(1, youArea?.roads ?? 1);
@@ -285,7 +292,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
   const youHasRoute = view.longestRouteOwner === view.you;
   const youHasArmy = view.largestArmyOwner === view.you;
 
-  // Rakiplerin Bilgileri
   const opp1Area = opp1 ? view.players[opp1]?.area : null;
   const opp1RoadsCount = Math.max(1, opp1Area?.roads ?? 1);
   const opp1KnightsCount = opp1Area?.knights ?? 0;
@@ -311,9 +317,17 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
     (youHasRoute ? 1 : 0) +
     (youHasArmy ? 1 : 0);
 
+  // 4P mobil için oyuncunun yükseltmeye uygun hedef yığınını otomatik bulur
+  const youStacks = youArea?.stacks ?? [];
+  const upgradeTargetStack = pendingUpgrade
+    ? youStacks.find((s) =>
+        pendingUpgrade.type === 'city' ? s.top === 'settlement' : s.top === 'city'
+      )
+    : undefined;
+  const primaryYouStack = upgradeTargetStack ?? youStacks[0];
+
   return (
     <div className="relative w-full h-screen min-h-screen flex flex-col justify-between overflow-hidden">
-      {/* Son 10 Saniye Kırmızı Uyarı Çerçevesi & Vinyet Efekti */}
       <TimeWarningOverlay
         isActive={isActive}
         remainingSeconds={remainingSeconds}
@@ -321,7 +335,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
       {/* 1. ÜST TABLO BARI (PC'de Aynen Kalır, Mobilde Gizlenir) */}
       <header className={`${isMobile ? 'hidden' : 'flex'} fixed top-1 sm:top-2 left-1/2 -translate-x-1/2 z-50 w-[98%] max-w-6xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-0.5 sm:py-2 shadow-2xl items-center justify-between transition-all`}>
-        {/* Sol: Tur & Sıra */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           <span className="font-black text-amber-500 text-xs sm:text-sm tracking-wider uppercase hidden sm:inline">
             Catan 4P • On the Road
@@ -342,7 +355,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           </div>
         </div>
 
-        {/* Orta: Skor Tablosu (Tüm 4 Oyuncu) */}
         <div className="flex items-center gap-1 sm:gap-2">
           {view.turnOrder.map((pid) => {
             const p = view.players[pid];
@@ -382,7 +394,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           })}
         </div>
 
-        {/* Sağ: Zamanlayıcı & Masadan Ayrıl */}
         <div className="flex items-center gap-2">
           {remainingSeconds !== null && (
             <div
@@ -421,7 +432,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       </header>
 
-      {/* MOBİL İÇİN MİNİMALİST ÜST BİLGİ & KONTROL ROZETİ (Tablo Barı Yerine Masayı Asla Kapatmayan Mikro Kontrol) */}
+      {/* MOBİL İÇİN MİNİMALİST ÜST BİLGİ & KONTROL ROZETİ */}
       {isMobile && (
         <div className="fixed top-1 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md border border-slate-700/60 px-2.5 py-0.5 rounded-full text-[10px] shadow-lg pointer-events-auto">
           <span className="text-slate-400 font-medium">Tur #{view.turnNumber}</span>
@@ -458,7 +469,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       )}
 
-      {/* Yol İkamesi Seçim Çubuğu (Birden fazla fazla kaynak seçeneği olduğunda) */}
+      {/* Yol İkamesi Seçim Çubuğu */}
       {pendingSubstitution && (
         <div className={`fixed ${isMobile ? 'top-7' : 'top-14'} left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border border-amber-400/80 rounded-xl px-3 py-1.5 shadow-2xl flex items-center gap-2 animate-in fade-in`}>
           <span className="text-[11px] sm:text-xs font-bold text-amber-200 whitespace-nowrap">
@@ -507,7 +518,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       )}
 
-      {/* 2. OYUN MATI (4 EKSENLİ KIRMIZI KADİFE ZEMİN) */}
+      {/* 2. OYUN MATI (4 Kişilik Oyunda Masa Üstünde Kayarak Açılan Çekmece & Dar Sütun Düzeni) */}
       <GameMat playerCount={4}>
         {/* Üst Kadranlar (Sol Üst: Opp1, Sağ Üst: Opp2) */}
         <div className={`w-full grid grid-cols-2 gap-2 sm:gap-4 ${isMobile ? 'pt-1' : 'pt-1 sm:pt-10'}`}>
@@ -515,14 +526,15 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           {opp1 && (
             <div className="flex flex-col items-start gap-1 relative p-1 transition-all duration-300">
               <div className="flex items-start gap-2 sm:gap-3">
-                {/* Rakip 1 Eli & İsim Etiketi */}
                 <div className="flex flex-col items-start">
-                  <FannedHand
-                    cardCount={view.players[opp1]?.handCount ?? 0}
-                    isCurrentPlayer={false}
-                    corner="top-left"
-                    scale={opponentHandScale}
-                  />
+                  <div className={`transition-opacity duration-300 ${handCardsDealt ? 'opacity-100' : 'opacity-0'}`}>
+                    <FannedHand
+                      cardCount={view.players[opp1]?.handCount ?? 0}
+                      isCurrentPlayer={false}
+                      corner="top-left"
+                      scale={opponentHandScale}
+                    />
+                  </div>
                   <PlayerNameplate
                     name={view.players[opp1]?.name || 'Oyuncu'}
                     isTurn={view.activePlayerId === opp1}
@@ -536,22 +548,26 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   />
                 </div>
 
-                {/* Rakip 1 Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
-                <div className={`flex ${isMobile ? 'flex-nowrap gap-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[320px]'} items-end pt-1`}>
-                  {/* Settlement Stacks */}
+                {/* Rakip 1 Masadaki Fiziksel Kartları (Üst rakipte çekmeceler aşağı doğru kayar) */}
+                <div
+                  className={`flex ${isMobile ? 'flex-nowrap gap-0.5' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[320px]'} items-start pt-1 transition-opacity duration-300 ${
+                    tableCardsDealt ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
                   {isMobile
-                    ? groupSettlementStacks(opp1Area?.stacks).map((group) => (
+                    ? opp1Area?.stacks?.[0] && (
                         <CardStack
-                          key={group.primaryStack.id}
-                          stack={group.primaryStack}
-                          count={group.count}
+                          key={opp1Area.stacks[0].id}
+                          stack={opp1Area.stacks[0]}
+                          allStacks={opp1Area.stacks}
                           folderMode={true}
+                          drawerDirection="down"
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
                           baseHeight={194}
                         />
-                      ))
+                      )
                     : opp1Area?.stacks.map((stack) => (
                         <CardStack
                           key={stack.id}
@@ -565,7 +581,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp1}-roads`}
@@ -574,8 +589,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="down"
                       isDraggable={false}
                       position={positionsByPlayer[opp1]?.[`${opp1}-road-0`]}
                       zIndex={cardZIndices[`${opp1}-road-0`]}
@@ -601,7 +617,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp1}-knights`}
@@ -610,8 +625,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="down"
                       isDraggable={false}
                       position={positionsByPlayer[opp1]?.[`${opp1}-knight-0`]}
                       zIndex={cardZIndices[`${opp1}-knight-0`]}
@@ -636,34 +652,40 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Bonus Cards */}
-                  {opp1HasRoute && (
-                    <TableCard
-                      key={`${opp1}-bonus-longest-route`}
-                      id={`${opp1}-bonus-longest-route`}
-                      type="longest_route"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp1]?.[`${opp1}-bonus-longest-route`]}
-                      zIndex={cardZIndices[`${opp1}-bonus-longest-route`]}
-                      onInspect={() => onInspectCard('longest_route')}
-                    />
-                  )}
-                  {opp1HasArmy && (
-                    <TableCard
-                      key={`${opp1}-bonus-largest-army`}
-                      id={`${opp1}-bonus-largest-army`}
-                      type="largest_army"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp1]?.[`${opp1}-bonus-largest-army`]}
-                      zIndex={cardZIndices[`${opp1}-bonus-largest-army`]}
-                      onInspect={() => onInspectCard('largest_army')}
-                    />
+                  {/* Bonus Kartlar: Mobilde tek dar sütunda üst üste dizilir */}
+                  {(opp1HasRoute || opp1HasArmy) && (
+                    <div className={isMobile ? 'flex flex-col gap-0.5 items-start' : 'flex gap-1 items-end'}>
+                      {opp1HasRoute && (
+                        <TableCard
+                          key={`${opp1}-bonus-longest-route`}
+                          id={`${opp1}-bonus-longest-route`}
+                          type="longest_route"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="down"
+                          position={positionsByPlayer[opp1]?.[`${opp1}-bonus-longest-route`]}
+                          zIndex={cardZIndices[`${opp1}-bonus-longest-route`]}
+                          onInspect={() => onInspectCard('longest_route')}
+                        />
+                      )}
+                      {opp1HasArmy && (
+                        <TableCard
+                          key={`${opp1}-bonus-largest-army`}
+                          id={`${opp1}-bonus-largest-army`}
+                          type="largest_army"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="down"
+                          position={positionsByPlayer[opp1]?.[`${opp1}-bonus-largest-army`]}
+                          zIndex={cardZIndices[`${opp1}-bonus-largest-army`]}
+                          onInspect={() => onInspectCard('largest_army')}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -674,14 +696,15 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           {opp2 && (
             <div className="flex flex-col items-end gap-1 relative p-1 transition-all duration-300">
               <div className="flex items-start gap-2 sm:gap-3 flex-row-reverse">
-                {/* Rakip 2 Eli & İsim Etiketi */}
                 <div className="flex flex-col items-end">
-                  <FannedHand
-                    cardCount={view.players[opp2]?.handCount ?? 0}
-                    isCurrentPlayer={false}
-                    corner="top-right"
-                    scale={opponentHandScale}
-                  />
+                  <div className={`transition-opacity duration-300 ${handCardsDealt ? 'opacity-100' : 'opacity-0'}`}>
+                    <FannedHand
+                      cardCount={view.players[opp2]?.handCount ?? 0}
+                      isCurrentPlayer={false}
+                      corner="top-right"
+                      scale={opponentHandScale}
+                    />
+                  </div>
                   <PlayerNameplate
                     name={view.players[opp2]?.name || 'Oyuncu'}
                     isTurn={view.activePlayerId === opp2}
@@ -696,20 +719,25 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 </div>
 
                 {/* Rakip 2 Masadaki Fiziksel Kartları */}
-                <div className={`flex ${isMobile ? 'flex-nowrap gap-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[340px]'} items-end justify-end pt-1`}>
+                <div
+                  className={`flex ${isMobile ? 'flex-nowrap gap-0.5' : 'flex-wrap gap-1 sm:gap-2 max-w-[200px] sm:max-w-[340px]'} items-start justify-end pt-1 transition-opacity duration-300 ${
+                    tableCardsDealt ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
                   {isMobile
-                    ? groupSettlementStacks(opp2Area?.stacks).map((group) => (
+                    ? opp2Area?.stacks?.[0] && (
                         <CardStack
-                          key={group.primaryStack.id}
-                          stack={group.primaryStack}
-                          count={group.count}
+                          key={opp2Area.stacks[0].id}
+                          stack={opp2Area.stacks[0]}
+                          allStacks={opp2Area.stacks}
                           folderMode={true}
+                          drawerDirection="down"
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
                           baseHeight={194}
                         />
-                      ))
+                      )
                     : opp2Area?.stacks.map((stack) => (
                         <CardStack
                           key={stack.id}
@@ -723,7 +751,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp2}-roads`}
@@ -732,8 +759,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="down"
                       isDraggable={false}
                       position={positionsByPlayer[opp2]?.[`${opp2}-road-0`]}
                       zIndex={cardZIndices[`${opp2}-road-0`]}
@@ -759,7 +787,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp2}-knights`}
@@ -768,8 +795,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="down"
                       isDraggable={false}
                       position={positionsByPlayer[opp2]?.[`${opp2}-knight-0`]}
                       zIndex={cardZIndices[`${opp2}-knight-0`]}
@@ -794,33 +822,39 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {opp2HasRoute && (
-                    <TableCard
-                      key={`${opp2}-bonus-longest-route`}
-                      id={`${opp2}-bonus-longest-route`}
-                      type="longest_route"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp2]?.[`${opp2}-bonus-longest-route`]}
-                      zIndex={cardZIndices[`${opp2}-bonus-longest-route`]}
-                      onInspect={() => onInspectCard('longest_route')}
-                    />
-                  )}
-                  {opp2HasArmy && (
-                    <TableCard
-                      key={`${opp2}-bonus-largest-army`}
-                      id={`${opp2}-bonus-largest-army`}
-                      type="largest_army"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp2]?.[`${opp2}-bonus-largest-army`]}
-                      zIndex={cardZIndices[`${opp2}-bonus-largest-army`]}
-                      onInspect={() => onInspectCard('largest_army')}
-                    />
+                  {(opp2HasRoute || opp2HasArmy) && (
+                    <div className={isMobile ? 'flex flex-col gap-0.5 items-end' : 'flex gap-1 items-end'}>
+                      {opp2HasRoute && (
+                        <TableCard
+                          key={`${opp2}-bonus-longest-route`}
+                          id={`${opp2}-bonus-longest-route`}
+                          type="longest_route"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="down"
+                          position={positionsByPlayer[opp2]?.[`${opp2}-bonus-longest-route`]}
+                          zIndex={cardZIndices[`${opp2}-bonus-longest-route`]}
+                          onInspect={() => onInspectCard('longest_route')}
+                        />
+                      )}
+                      {opp2HasArmy && (
+                        <TableCard
+                          key={`${opp2}-bonus-largest-army`}
+                          id={`${opp2}-bonus-largest-army`}
+                          type="largest_army"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="down"
+                          position={positionsByPlayer[opp2]?.[`${opp2}-bonus-largest-army`]}
+                          zIndex={cardZIndices[`${opp2}-bonus-largest-army`]}
+                          onInspect={() => onInspectCard('largest_army')}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -828,7 +862,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
           )}
         </div>
 
-        {/* Orta Alan: BUILDING ROW MAT (Masanın Tam Fiziksel Merkezinde) */}
+        {/* Orta Alan: BUILDING ROW MAT */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto">
           <BuildingRowMat
             view={view}
@@ -840,19 +874,20 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
 
         {/* Alt Kadranlar (Sol Alt: Opp3, Sağ Alt: SEN / Aktif Oyuncu) */}
-        <div className="w-full grid grid-cols-2 gap-2 sm:gap-4 pb-1 sm:pb-3">
+        <div className="w-full grid grid-cols-2 gap-1 sm:gap-4 pb-1 sm:pb-3">
           {/* Sol Alt Kadran: Opp3 */}
           {opp3 ? (
             <div className="flex flex-col items-start gap-1 relative justify-end p-1 transition-all duration-300">
-              <div className="flex items-end gap-2 sm:gap-3">
-                {/* Rakip 3 Eli & İsim Etiketi */}
+              <div className="flex items-end gap-1.5 sm:gap-3">
                 <div className="flex flex-col items-start">
-                  <FannedHand
-                    cardCount={view.players[opp3]?.handCount ?? 0}
-                    isCurrentPlayer={false}
-                    corner="bottom-left"
-                    scale={opponentHandScale}
-                  />
+                  <div className={`transition-opacity duration-300 ${handCardsDealt ? 'opacity-100' : 'opacity-0'}`}>
+                    <FannedHand
+                      cardCount={view.players[opp3]?.handCount ?? 0}
+                      isCurrentPlayer={false}
+                      corner="bottom-left"
+                      scale={opponentHandScale}
+                    />
+                  </div>
                   <PlayerNameplate
                     name={view.players[opp3]?.name || 'Oyuncu'}
                     isTurn={view.activePlayerId === opp3}
@@ -866,21 +901,26 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                   />
                 </div>
 
-                {/* Rakip 3 Masadaki Fiziksel Kartları */}
-                <div className={`flex ${isMobile ? 'flex-nowrap gap-1 pr-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[160px] sm:max-w-[220px] lg:max-w-[340px] pr-1 sm:pr-10 lg:pr-14'} items-end`}>
+                {/* Rakip 3 Masadaki Fiziksel Kartları (Alt rakipte çekmeceler yukarı doğru kayar, tek bina sütunu) */}
+                <div
+                  className={`flex ${isMobile ? 'flex-nowrap gap-0.5 pr-1' : 'flex-wrap gap-1 sm:gap-2 max-w-[160px] sm:max-w-[220px] lg:max-w-[340px] pr-1 sm:pr-10 lg:pr-14'} items-end transition-opacity duration-300 ${
+                    tableCardsDealt ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
                   {isMobile
-                    ? groupSettlementStacks(opp3Area?.stacks).map((group) => (
+                    ? opp3Area?.stacks?.[0] && (
                         <CardStack
-                          key={group.primaryStack.id}
-                          stack={group.primaryStack}
-                          count={group.count}
+                          key={opp3Area.stacks[0].id}
+                          stack={opp3Area.stacks[0]}
+                          allStacks={opp3Area.stacks}
                           folderMode={true}
+                          drawerDirection="up"
                           onInspectCard={onInspectCard}
                           scale={opponentCardScale}
                           baseWidth={125}
                           baseHeight={194}
                         />
-                      ))
+                      )
                     : opp3Area?.stacks.map((stack) => (
                         <CardStack
                           key={stack.id}
@@ -894,7 +934,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         />
                       ))}
 
-                  {/* Road Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp3}-roads`}
@@ -903,8 +942,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="up"
                       isDraggable={false}
                       position={positionsByPlayer[opp3]?.[`${opp3}-road-0`]}
                       zIndex={cardZIndices[`${opp3}-road-0`]}
@@ -930,7 +970,6 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {/* Knight Cards: Mobilde başlık klasörü, PC'de geniş yan yana */}
                   {isMobile ? (
                     <StackedTableCards
                       idPrefix={`${opp3}-knights`}
@@ -939,8 +978,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       scale={opponentCardScale}
                       baseWidth={125}
                       baseHeight={194}
-                      layerOffset={30}
+                      layerOffset={24}
                       folderMode={true}
+                      drawerDirection="up"
                       isDraggable={false}
                       position={positionsByPlayer[opp3]?.[`${opp3}-knight-0`]}
                       zIndex={cardZIndices[`${opp3}-knight-0`]}
@@ -965,33 +1005,39 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                     })
                   )}
 
-                  {opp3HasRoute && (
-                    <TableCard
-                      key={`${opp3}-bonus-longest-route`}
-                      id={`${opp3}-bonus-longest-route`}
-                      type="longest_route"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp3]?.[`${opp3}-bonus-longest-route`]}
-                      zIndex={cardZIndices[`${opp3}-bonus-longest-route`]}
-                      onInspect={() => onInspectCard('longest_route')}
-                    />
-                  )}
-                  {opp3HasArmy && (
-                    <TableCard
-                      key={`${opp3}-bonus-largest-army`}
-                      id={`${opp3}-bonus-largest-army`}
-                      type="largest_army"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={isMobile}
-                      position={positionsByPlayer[opp3]?.[`${opp3}-bonus-largest-army`]}
-                      zIndex={cardZIndices[`${opp3}-bonus-largest-army`]}
-                      onInspect={() => onInspectCard('largest_army')}
-                    />
+                  {(opp3HasRoute || opp3HasArmy) && (
+                    <div className={isMobile ? 'flex flex-col gap-0.5 items-start' : 'flex gap-1 items-end'}>
+                      {opp3HasRoute && (
+                        <TableCard
+                          key={`${opp3}-bonus-longest-route`}
+                          id={`${opp3}-bonus-longest-route`}
+                          type="longest_route"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="up"
+                          position={positionsByPlayer[opp3]?.[`${opp3}-bonus-longest-route`]}
+                          zIndex={cardZIndices[`${opp3}-bonus-longest-route`]}
+                          onInspect={() => onInspectCard('longest_route')}
+                        />
+                      )}
+                      {opp3HasArmy && (
+                        <TableCard
+                          key={`${opp3}-bonus-largest-army`}
+                          id={`${opp3}-bonus-largest-army`}
+                          type="largest_army"
+                          scale={opponentCardScale}
+                          baseWidth={186}
+                          baseHeight={120}
+                          folderMode={isMobile}
+                          drawerDirection="up"
+                          position={positionsByPlayer[opp3]?.[`${opp3}-bonus-largest-army`]}
+                          zIndex={cardZIndices[`${opp3}-bonus-largest-army`]}
+                          onInspect={() => onInspectCard('largest_army')}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1000,40 +1046,39 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
             <div />
           )}
 
-          {/* Sağ Alt Kadran: SENİN MASAN (Sürükleme Alanı & Kaynak Kartları) */}
+          {/* Sağ Alt Kadran: SENİN MASAN (Sola doğru sapıtmaması için tüm binalar 1 sütunda, yollar 1 sütunda, şövalyeler 1 sütunda, bonuslar 1 sütunda) */}
           <div className={`flex ${isMobilePortrait ? 'flex-col items-end' : 'items-end justify-end'} gap-1 sm:gap-4 lg:gap-8 relative p-0.5 sm:p-1 transition-all duration-300 pb-1 w-full pl-1 sm:pl-10 lg:pl-16 pr-1 sm:pr-2`}>
-            {/* 1. Masadaki Fiziksel Kartlar (Kendi el kartlarının hemen solunda ve bitişik) */}
-            <div className="relative z-20 flex-shrink-0">
-              <div className={`flex ${isMobile ? 'flex-nowrap gap-1 mr-1' : 'flex-wrap gap-1 sm:gap-2.5 max-w-[140px] sm:max-w-xl lg:max-w-4xl'} items-end justify-end`}>
-              {/* Yerleşim Yığınları: Mobilde aynı tür binalar gruplanır, PC'de serbest sürüklenir */}
-              {isMobile
-                ? groupSettlementStacks(youArea?.stacks).map((group) => {
-                    const stack = group.primaryStack;
-                    const isSettlement = stack.top === 'settlement';
-                    const isCity = stack.top === 'city';
-                    const canSelectForCity = pendingUpgrade?.type === 'city' && isSettlement;
-                    const canSelectForMetro = pendingUpgrade?.type === 'metropolis' && isCity;
-                    const isSelectable = Boolean(canSelectForCity || canSelectForMetro);
-                    const isSelected = group.stacks.some((s) => s.id === selectedStackId);
-
-                    return (
-                      <CardStack
-                        key={stack.id}
-                        stack={stack}
-                        count={group.count}
-                        isSelectable={isSelectable}
-                        isSelected={isSelected}
-                        onSelect={handleConfirmUpgrade}
-                        onInspectCard={onInspectCard}
-                        scale={playerCardScale}
-                        baseWidth={125}
-                        baseHeight={194}
-                        isDraggable={false}
-                        folderMode={true}
-                      />
-                    );
-                  })
-                : youArea?.stacks.map((stack, index) => {
+            <div
+              className={`relative z-20 flex-shrink-0 transition-opacity duration-300 ${
+                tableCardsDealt ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <div className={`flex ${isMobile ? 'flex-nowrap gap-0.5 mr-0.5' : 'flex-wrap gap-1 sm:gap-2.5 max-w-[140px] sm:max-w-xl lg:max-w-4xl'} items-end justify-end`}>
+                {/* Yerleşim Yığınları: 4P Mobilde tüm binalar tek bir çekmece sütununda dikey istiflenir (sola doğru uzamaz!) */}
+                {isMobile ? (
+                  primaryYouStack && (
+                    <CardStack
+                      key="you-4p-combined-buildings"
+                      stack={primaryYouStack}
+                      allStacks={youStacks}
+                      isSelectable={Boolean(upgradeTargetStack)}
+                      isSelected={youStacks.some((s) => s.id === selectedStackId)}
+                      onSelect={() => {
+                        if (upgradeTargetStack) {
+                          handleConfirmUpgrade(upgradeTargetStack.id);
+                        }
+                      }}
+                      onInspectCard={onInspectCard}
+                      scale={playerCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      isDraggable={false}
+                      folderMode={true}
+                      drawerDirection="up"
+                    />
+                  )
+                ) : (
+                  youArea?.stacks.map((stack, index) => {
                     const isSettlement = stack.top === 'settlement';
                     const isCity = stack.top === 'city';
 
@@ -1071,201 +1116,211 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         clampPosition={clampFn}
                       />
                     );
-                  })}
+                  })
+                )}
 
-              {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de serbest sürüklenebilir kartlar */}
-              {isMobile ? (
-                <StackedTableCards
-                  idPrefix={`${view.you}-roads`}
-                  type="road"
-                  count={youRoadsCount}
-                  scale={playerCardScale}
-                  baseWidth={125}
-                  baseHeight={194}
-                  layerOffset={30}
-                  isDraggable={false}
-                  folderMode={true}
-                  position={cardPositions[`${view.you}-road-0`] || cardPositions['you-4p-road-0']}
-                  zIndex={cardZIndices[`${view.you}-road-0`] || cardZIndices['you-4p-road-0']}
-                  onInspect={() => onInspectCard('road')}
-                />
-              ) : (
-                Array.from({ length: youRoadsCount }).map((_, i) => {
-                  const cardId = `${view.you}-road-${i}`;
-                  const slotIdx = (youArea?.stacks.length ?? 1) + i;
-                  const clampFn = createSafeZoneClamper({
-                    layout: '4P',
-                    handPosition: 'bottom-right',
-                    slotIndex: slotIdx,
-                    totalSlots: totalYouCards,
-                    cardWidth: Math.round(125 * playerCardScale),
-                  });
+                {/* Road Cards */}
+                {isMobile ? (
+                  <StackedTableCards
+                    idPrefix={`${view.you}-roads`}
+                    type="road"
+                    count={youRoadsCount}
+                    scale={playerCardScale}
+                    baseWidth={125}
+                    baseHeight={194}
+                    layerOffset={24}
+                    isDraggable={false}
+                    folderMode={true}
+                    drawerDirection="up"
+                    position={cardPositions[`${view.you}-road-0`] || cardPositions['you-4p-road-0']}
+                    zIndex={cardZIndices[`${view.you}-road-0`] || cardZIndices['you-4p-road-0']}
+                    onInspect={() => onInspectCard('road')}
+                  />
+                ) : (
+                  Array.from({ length: youRoadsCount }).map((_, i) => {
+                    const cardId = `${view.you}-road-${i}`;
+                    const slotIdx = (youArea?.stacks.length ?? 1) + i;
+                    const clampFn = createSafeZoneClamper({
+                      layout: '4P',
+                      handPosition: 'bottom-right',
+                      slotIndex: slotIdx,
+                      totalSlots: totalYouCards,
+                      cardWidth: Math.round(125 * playerCardScale),
+                    });
 
-                  return (
-                    <TableCard
-                      key={cardId}
-                      id={cardId}
-                      type="road"
-                      isStarting={i === 0}
-                      scale={playerCardScale}
-                      baseWidth={125}
-                      baseHeight={194}
-                      isDraggable={true}
-                      position={cardPositions[cardId] || cardPositions[`you-4p-road-${i}`]}
-                      zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-road-${i}`]}
-                      onBringToFront={() => bringToFront(cardId)}
-                      onPositionChange={(pos) => updateCardPosition(cardId, pos)}
-                      onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
-                      onDragChange={setIsCardDragging}
-                      clampPosition={clampFn}
-                      onInspect={() => onInspectCard('road')}
-                    />
-                  );
-                })
-              )}
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="road"
+                        isStarting={i === 0}
+                        scale={playerCardScale}
+                        baseWidth={125}
+                        baseHeight={194}
+                        isDraggable={true}
+                        position={cardPositions[cardId] || cardPositions[`you-4p-road-${i}`]}
+                        zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-road-${i}`]}
+                        onBringToFront={() => bringToFront(cardId)}
+                        onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                        onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
+                        onDragChange={setIsCardDragging}
+                        clampPosition={clampFn}
+                        onInspect={() => onInspectCard('road')}
+                      />
+                    );
+                  })
+                )}
 
-              {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de serbest sürüklenebilir kartlar */}
-              {isMobile ? (
-                <StackedTableCards
-                  idPrefix={`${view.you}-knights`}
-                  type="knight"
-                  count={youKnightsCount}
-                  scale={playerCardScale}
-                  baseWidth={125}
-                  baseHeight={194}
-                  layerOffset={30}
-                  isDraggable={false}
-                  folderMode={true}
-                  position={cardPositions[`${view.you}-knight-0`] || cardPositions['you-4p-knight-0']}
-                  zIndex={cardZIndices[`${view.you}-knight-0`] || cardZIndices['you-4p-knight-0']}
-                  onInspect={() => onInspectCard('knight')}
-                />
-              ) : (
-                Array.from({ length: youKnightsCount }).map((_, i) => {
-                  const cardId = `${view.you}-knight-${i}`;
-                  const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
-                  const clampFn = createSafeZoneClamper({
-                    layout: '4P',
-                    handPosition: 'bottom-right',
-                    slotIndex: slotIdx,
-                    totalSlots: totalYouCards,
-                    cardWidth: Math.round(125 * playerCardScale),
-                  });
+                {/* Knight Cards */}
+                {isMobile ? (
+                  <StackedTableCards
+                    idPrefix={`${view.you}-knights`}
+                    type="knight"
+                    count={youKnightsCount}
+                    scale={playerCardScale}
+                    baseWidth={125}
+                    baseHeight={194}
+                    layerOffset={24}
+                    isDraggable={false}
+                    folderMode={true}
+                    drawerDirection="up"
+                    position={cardPositions[`${view.you}-knight-0`] || cardPositions['you-4p-knight-0']}
+                    zIndex={cardZIndices[`${view.you}-knight-0`] || cardZIndices['you-4p-knight-0']}
+                    onInspect={() => onInspectCard('knight')}
+                  />
+                ) : (
+                  Array.from({ length: youKnightsCount }).map((_, i) => {
+                    const cardId = `${view.you}-knight-${i}`;
+                    const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
+                    const clampFn = createSafeZoneClamper({
+                      layout: '4P',
+                      handPosition: 'bottom-right',
+                      slotIndex: slotIdx,
+                      totalSlots: totalYouCards,
+                      cardWidth: Math.round(125 * playerCardScale),
+                    });
 
-                  return (
-                    <TableCard
-                      key={cardId}
-                      id={cardId}
-                      type="knight"
-                      scale={playerCardScale}
-                      baseWidth={125}
-                      baseHeight={194}
-                      isDraggable={true}
-                      position={cardPositions[cardId] || cardPositions[`you-4p-knight-${i}`]}
-                      zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-knight-${i}`]}
-                      onBringToFront={() => bringToFront(cardId)}
-                      onPositionChange={(pos) => updateCardPosition(cardId, pos)}
-                      onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
-                      onDragChange={setIsCardDragging}
-                      clampPosition={clampFn}
-                      onInspect={() => onInspectCard('knight')}
-                    />
-                  );
-                })
-              )}
+                    return (
+                      <TableCard
+                        key={cardId}
+                        id={cardId}
+                        type="knight"
+                        scale={playerCardScale}
+                        baseWidth={125}
+                        baseHeight={194}
+                        isDraggable={true}
+                        position={cardPositions[cardId] || cardPositions[`you-4p-knight-${i}`]}
+                        zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-knight-${i}`]}
+                        onBringToFront={() => bringToFront(cardId)}
+                        onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                        onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
+                        onDragChange={setIsCardDragging}
+                        clampPosition={clampFn}
+                        onInspect={() => onInspectCard('knight')}
+                      />
+                    );
+                  })
+                )}
 
-              {/* Bonus Kartlar */}
-              {youHasRoute && (
-                <TableCard
-                  key="bonus-4p-longest-route"
-                  id={`${view.you}-bonus-longest-route`}
-                  type="longest_route"
-                  scale={playerCardScale}
-                  baseWidth={186}
-                  baseHeight={120}
-                  isDraggable={!isMobile}
-                  folderMode={isMobile}
-                  position={
-                    cardPositions[`${view.you}-bonus-longest-route`] ||
-                    cardPositions['bonus-4p-longest-route']
-                  }
-                  zIndex={
-                    cardZIndices[`${view.you}-bonus-longest-route`] ||
-                    cardZIndices['bonus-4p-longest-route']
-                  }
-                  onBringToFront={() => bringToFront(`${view.you}-bonus-longest-route`)}
-                  onPositionChange={(pos) =>
-                    updateCardPosition(`${view.you}-bonus-longest-route`, pos)
-                  }
-                  onDragMove={(pos) =>
-                    broadcastCardPosition(`${view.you}-bonus-longest-route`, pos)
-                  }
-                  onDragChange={setIsCardDragging}
-                  clampPosition={createSafeZoneClamper({
-                    layout: '4P',
-                    handPosition: 'bottom-right',
-                    slotIndex:
-                      (youArea?.stacks.length ?? 1) +
-                      youRoadsCount +
-                      youKnightsCount,
-                    totalSlots: totalYouCards,
-                    cardWidth: Math.round(186 * playerCardScale),
-                  })}
-                  onInspect={() => onInspectCard('longest_route')}
-                />
-              )}
-              {youHasArmy && (
-                <TableCard
-                  key="bonus-4p-largest-army"
-                  id={`${view.you}-bonus-largest-army`}
-                  type="largest_army"
-                  scale={playerCardScale}
-                  baseWidth={186}
-                  baseHeight={120}
-                  isDraggable={!isMobile}
-                  folderMode={isMobile}
-                  position={
-                    cardPositions[`${view.you}-bonus-largest-army`] ||
-                    cardPositions['bonus-4p-largest-army']
-                  }
-                  zIndex={
-                    cardZIndices[`${view.you}-bonus-largest-army`] ||
-                    cardZIndices['bonus-4p-largest-army']
-                  }
-                  onBringToFront={() => bringToFront(`${view.you}-bonus-largest-army`)}
-                  onPositionChange={(pos) =>
-                    updateCardPosition(`${view.you}-bonus-largest-army`, pos)
-                  }
-                  onDragMove={(pos) =>
-                    broadcastCardPosition(`${view.you}-bonus-largest-army`, pos)
-                  }
-                  onDragChange={setIsCardDragging}
-                  clampPosition={createSafeZoneClamper({
-                    layout: '4P',
-                    handPosition: 'bottom-right',
-                    slotIndex:
-                      (youArea?.stacks.length ?? 1) +
-                      youRoadsCount +
-                      youKnightsCount +
-                      (youHasRoute ? 1 : 0),
-                    totalSlots: totalYouCards,
-                    cardWidth: Math.round(160 * playerCardScale),
-                  })}
-                  onInspect={() => onInspectCard('largest_army')}
-                />
-              )}
+                {/* Bonus Kartlar: Mobilde tek bir dikey sütunda üst üste dizilir (sola doğru uzamaz) */}
+                {(youHasRoute || youHasArmy) && (
+                  <div className={isMobile ? 'flex flex-col gap-0.5 items-end' : 'flex gap-1 items-end'}>
+                    {youHasRoute && (
+                      <TableCard
+                        key="bonus-4p-longest-route"
+                        id={`${view.you}-bonus-longest-route`}
+                        type="longest_route"
+                        scale={playerCardScale}
+                        baseWidth={186}
+                        baseHeight={120}
+                        isDraggable={!isMobile}
+                        folderMode={isMobile}
+                        drawerDirection="up"
+                        position={
+                          cardPositions[`${view.you}-bonus-longest-route`] ||
+                          cardPositions['bonus-4p-longest-route']
+                        }
+                        zIndex={
+                          cardZIndices[`${view.you}-bonus-longest-route`] ||
+                          cardZIndices['bonus-4p-longest-route']
+                        }
+                        onBringToFront={() => bringToFront(`${view.you}-bonus-longest-route`)}
+                        onPositionChange={(pos) =>
+                          updateCardPosition(`${view.you}-bonus-longest-route`, pos)
+                        }
+                        onDragMove={(pos) =>
+                          broadcastCardPosition(`${view.you}-bonus-longest-route`, pos)
+                        }
+                        onDragChange={setIsCardDragging}
+                        clampPosition={createSafeZoneClamper({
+                          layout: '4P',
+                          handPosition: 'bottom-right',
+                          slotIndex:
+                            (youArea?.stacks.length ?? 1) +
+                            youRoadsCount +
+                            youKnightsCount,
+                          totalSlots: totalYouCards,
+                          cardWidth: Math.round(186 * playerCardScale),
+                        })}
+                        onInspect={() => onInspectCard('longest_route')}
+                      />
+                    )}
+                    {youHasArmy && (
+                      <TableCard
+                        key="bonus-4p-largest-army"
+                        id={`${view.you}-bonus-largest-army`}
+                        type="largest_army"
+                        scale={playerCardScale}
+                        baseWidth={186}
+                        baseHeight={120}
+                        isDraggable={!isMobile}
+                        folderMode={isMobile}
+                        drawerDirection="up"
+                        position={
+                          cardPositions[`${view.you}-bonus-largest-army`] ||
+                          cardPositions['bonus-4p-largest-army']
+                        }
+                        zIndex={
+                          cardZIndices[`${view.you}-bonus-largest-army`] ||
+                          cardZIndices['bonus-4p-largest-army']
+                        }
+                        onBringToFront={() => bringToFront(`${view.you}-bonus-largest-army`)}
+                        onPositionChange={(pos) =>
+                          updateCardPosition(`${view.you}-bonus-largest-army`, pos)
+                        }
+                        onDragMove={(pos) =>
+                          broadcastCardPosition(`${view.you}-bonus-largest-army`, pos)
+                        }
+                        onDragChange={setIsCardDragging}
+                        clampPosition={createSafeZoneClamper({
+                          layout: '4P',
+                          handPosition: 'bottom-right',
+                          slotIndex:
+                            (youArea?.stacks.length ?? 1) +
+                            youRoadsCount +
+                            youKnightsCount +
+                            (youHasRoute ? 1 : 0),
+                          totalSlots: totalYouCards,
+                          cardWidth: Math.round(160 * playerCardScale),
+                        })}
+                        onInspect={() => onInspectCard('largest_army')}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* 2. Oyuncunun Elindeki Fiziksel Kaynak Yelpazesi & Altında İsim Plakası */}
             <div className="flex flex-col items-end z-10 shrink-0">
-              <FannedHand
-                hand={view.yourHand}
-                isCurrentPlayer={true}
-                corner="bottom-right"
-                onInspectCard={onInspectCard}
-                scale={playerHandScale}
-              />
+              <div className={`transition-opacity duration-300 ${handCardsDealt ? 'opacity-100' : 'opacity-0'}`}>
+                <FannedHand
+                  hand={view.yourHand}
+                  isCurrentPlayer={true}
+                  corner="bottom-right"
+                  onInspectCard={onInspectCard}
+                  scale={playerHandScale}
+                />
+              </div>
               <PlayerNameplate
                 name={youPlayer?.name || 'Sen'}
                 isTurn={isActive}
@@ -1283,11 +1338,10 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         </div>
       </GameMat>
 
-      {/* ALT AKSİYON BUTONLARI (4 Kişilik Oyunda Mobilde Sol-Alt ve Sağ-Alt Kartların Arasındaki Boşlukta, PC'de Ortada) */}
       <TableActionButtons
         layout="4P"
         compact={isMobile}
-        className={isMobile ? 'fixed bottom-1.5 left-[42%] -translate-x-1/2 z-40' : undefined}
+        className={isMobile ? 'fixed bottom-1.5 left-[39%] -translate-x-1/2 z-40' : undefined}
         onOpenTrade={onOpenTrade}
         onEndTurn={onEndTurn}
         isActive={isActive}
@@ -1296,13 +1350,12 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         activePlayerName={view.players[view.activePlayerId]?.name}
       />
 
-      {/* Kart ve Masa Animasyonları Katmanı (Çekilen kartlar, uçuşlar, masa vuruşları) */}
       <CardAnimationOverlay flyingCards={flyingCards} impacts={impacts} />
 
-      {/* Oyun Açılışı: Kart Karılması ve Dağıtımı Sinematiği */}
       <GameOpeningCinematic
         isOpen={showOpeningCinematic}
         view={view}
+        onTableCardsDealt={() => setTableCardsDealt(true)}
         onFinish={handleFinishOpening}
       />
     </div>

@@ -374,6 +374,7 @@ export const App: React.FC = () => {
         <GameDesk3P
           roomId={roomId}
           view={playerView}
+          isTableVisible={!isPortraitMode || bypassPortraitWarning}
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}
           onEndTurn={() => dispatchAction({ type: 'end_turn' })}
@@ -390,6 +391,7 @@ export const App: React.FC = () => {
         <GameDesk4P
           roomId={roomId}
           view={playerView}
+          isTableVisible={!isPortraitMode || bypassPortraitWarning}
           onInspectCard={handleInspectCard}
           onOpenTrade={() => setIsTradeModalOpen(true)}
           onEndTurn={() => dispatchAction({ type: 'end_turn' })}
