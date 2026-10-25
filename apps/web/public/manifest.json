@@ -1,0 +1,21 @@
+{
+  "name": "CATAN – On the Road",
+  "short_name": "Catan",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#150103",
+  "theme_color": "#150103",
+  "description": "CATAN – On the Road Çok Oyunculu Kart Oyunu",
+  "icons": [
+    {
+      "src": "/assets/cards/building/building_settlement.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/cards/building/building_settlement.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

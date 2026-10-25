@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Clock,
   LogOut,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
@@ -18,6 +20,7 @@ import { useCardAnimations, useLogAnimationListener } from '../lib/animationHook
 import { useRealtimeCardPositions } from '../lib/useRealtimeCardPositions.ts';
 import { createSafeZoneClamper } from '../lib/safePlacementBoundary.ts';
 import { useResponsiveLayout } from '../lib/useResponsiveLayout.ts';
+import { useFullscreen } from '../lib/useFullscreen.ts';
 
 const formatRemainingTime = (seconds: number): string => {
   if (seconds >= 60) {
@@ -62,6 +65,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
   } | null>(null);
 
   const {
+    isMobile,
     isMobilePortrait,
     isMobileLandscape,
     marketScale,
@@ -70,6 +74,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     playerCardScale,
     playerHandScale,
   } = useResponsiveLayout();
+
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   // Masadaki tüm kartların serbestçe sürüklenip bırakılması ve canlı senkronizasyonu
   const {
@@ -255,8 +261,8 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         remainingSeconds={remainingSeconds}
       />
 
-      {/* 1. ÜST YÜZEN MINIMAL OYUN BARI */}
-      <header className="fixed top-1 sm:top-2 left-1/2 -translate-x-1/2 z-50 w-[98%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-0.5 sm:py-2 shadow-2xl flex items-center justify-between transition-all">
+      {/* 1. ÜST TABLO BARI (PC'de Aynen Kalır, Mobilde Gizlenir) */}
+      <header className={`${isMobile ? 'hidden' : 'flex'} fixed top-1 sm:top-2 left-1/2 -translate-x-1/2 z-50 w-[98%] max-w-5xl bg-slate-950/85 backdrop-blur-md border border-slate-700/60 rounded-xl sm:rounded-2xl px-2 sm:px-4 py-0.5 sm:py-2 shadow-2xl items-center justify-between transition-all`}>
         {/* Sol: Tur & Sıra */}
         <div className="flex items-center gap-1.5 sm:gap-3">
           <span className="font-black text-amber-500 text-xs sm:text-sm tracking-wider uppercase hidden sm:inline">
@@ -336,6 +342,17 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           )}
 
           <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran (URL Çubuğunu Kapat)'}
+            aria-label="Tam Ekran Modu"
+            className="flex items-center gap-1 text-[11px] sm:text-xs text-amber-300 hover:text-white p-1 sm:p-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 transition border border-amber-600/50 shadow-sm"
+          >
+            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            <span className="hidden sm:inline">{isFullscreen ? 'Normal' : 'Tam Ekran'}</span>
+          </button>
+
+          <button
             onClick={onLeaveGame}
             title="Masadan Ayrıl"
             className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-400 p-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 transition border border-slate-800"
@@ -345,6 +362,43 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           </button>
         </div>
       </header>
+
+      {/* MOBİL İÇİN MİNİMALİST ÜST BİLGİ & KONTROL ROZETİ (Tablo Barı Yerine Masayı Asla Kapatmayan Mikro Kontrol) */}
+      {isMobile && (
+        <div className="fixed top-1 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md border border-slate-700/60 px-2.5 py-0.5 rounded-full text-[10px] shadow-lg pointer-events-auto">
+          <span className="text-slate-400 font-medium">Tur #{view.turnNumber}</span>
+          <span className="text-slate-600">•</span>
+          <span className={`font-bold truncate max-w-[85px] ${isActive ? 'text-sky-300' : 'text-amber-300'}`}>
+            {isActive ? 'Sende' : (view.players[view.activePlayerId]?.name || 'Bekleniyor')}
+          </span>
+          {remainingSeconds !== null && (
+            <>
+              <span className="text-slate-600">•</span>
+              <span className={`font-bold flex items-center gap-0.5 ${remainingSeconds <= 10 ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>
+                <Clock size={10} />
+                {formatRemainingTime(remainingSeconds)}
+              </span>
+            </>
+          )}
+          <div className="w-px h-3 bg-slate-700/60 mx-0.5" />
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran'}
+            className="text-amber-300 hover:text-white p-0.5 rounded"
+          >
+            {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+          </button>
+          <button
+            type="button"
+            onClick={onLeaveGame}
+            title="Masadan Ayrıl"
+            className="text-slate-400 hover:text-red-400 p-0.5 rounded"
+          >
+            <LogOut size={12} />
+          </button>
+        </div>
+      )}
 
       {/* Yükseltme Bildirim Çubuğu */}
       {pendingUpgrade && (
@@ -364,7 +418,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
       {/* 2. OYUN MATI (RED VELVET FELT TABLE) */}
       <GameMat playerCount={3}>
         {/* Üst Alan: 2 Rakip Oyuncu */}
-        <div className="w-full flex items-start justify-between gap-2 sm:gap-4 pt-7 sm:pt-10">
+        <div className="w-full flex items-start justify-between gap-2 sm:gap-4 pt-1 sm:pt-10">
           {/* Sol Rakip (oppLeft) */}
           {oppLeft && (
             <div className="flex flex-col items-start gap-1 relative p-1 transition-all duration-300">
@@ -377,18 +431,17 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     corner="top-left"
                     scale={opponentHandScale}
                   />
-                  {!isMobileLandscape && (
-                    <PlayerNameplate
-                      name={view.players[oppLeft]?.name || 'Oyuncu'}
-                      isTurn={view.activePlayerId === oppLeft}
-                      victoryPoints={view.players[oppLeft]?.visibleVP ?? 0}
-                      hasLongestRoute={oppLeftHasRoute}
-                      hasLargestArmy={oppLeftHasArmy}
-                      cardCount={view.players[oppLeft]?.handCount}
-                      align="left"
-                      className="mt-0.5 sm:mt-1"
-                    />
-                  )}
+                  <PlayerNameplate
+                    name={view.players[oppLeft]?.name || 'Oyuncu'}
+                    isTurn={view.activePlayerId === oppLeft}
+                    victoryPoints={view.players[oppLeft]?.visibleVP ?? 0}
+                    hasLongestRoute={oppLeftHasRoute}
+                    hasLargestArmy={oppLeftHasArmy}
+                    cardCount={view.players[oppLeft]?.handCount}
+                    align="left"
+                    compact={isMobilePortrait}
+                    className="mt-0.5 sm:mt-1"
+                  />
                 </div>
 
                 {/* Sol Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
@@ -488,18 +541,17 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     corner="top-right"
                     scale={opponentHandScale}
                   />
-                  {!isMobileLandscape && (
-                    <PlayerNameplate
-                      name={view.players[oppRight]?.name || 'Oyuncu'}
-                      isTurn={view.activePlayerId === oppRight}
-                      victoryPoints={view.players[oppRight]?.visibleVP ?? 0}
-                      hasLongestRoute={oppRightHasRoute}
-                      hasLargestArmy={oppRightHasArmy}
-                      cardCount={view.players[oppRight]?.handCount}
-                      align="right"
-                      className="mt-0.5 sm:mt-1"
-                    />
-                  )}
+                  <PlayerNameplate
+                    name={view.players[oppRight]?.name || 'Oyuncu'}
+                    isTurn={view.activePlayerId === oppRight}
+                    victoryPoints={view.players[oppRight]?.visibleVP ?? 0}
+                    hasLongestRoute={oppRightHasRoute}
+                    hasLargestArmy={oppRightHasArmy}
+                    cardCount={view.players[oppRight]?.handCount}
+                    align="right"
+                    compact={isMobilePortrait}
+                    className="mt-0.5 sm:mt-1"
+                  />
                 </div>
 
                 {/* Sağ Rakibin Masadaki Fiziksel Kartları (Köy, Yol, Şövalye, Bonus) */}
@@ -601,9 +653,9 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
 
         {/* Alt Alan: Kendi Masan (Sürükleme Alanı & Kaynak Kartları) */}
         <div className={`w-full flex ${isMobilePortrait ? 'flex-col items-end' : 'items-end justify-between'} gap-1 sm:gap-4 lg:gap-8 relative p-0.5 sm:p-1 transition-all duration-300 pb-1 sm:pb-3 pr-1 sm:pr-4 pl-1 sm:pl-16`}>
-          {/* 1. Masadaki Fiziksel Kartlar (Görünmez alan, kaynak kartlarının solunda serbestçe sürüklenebilir) */}
+          {/* 1. Masadaki Fiziksel Kartlar (Görünmez alan, mobilde sabit düzenli, masaüstünde serbestçe sürüklenebilir) */}
           <div className="relative z-20 flex-1 min-w-0">
-            <div className="flex flex-wrap gap-1 sm:gap-2.5 items-end justify-start max-w-[140px] sm:max-w-xl lg:max-w-4xl">
+            <div className={`flex flex-wrap gap-1 sm:gap-2.5 items-end justify-start ${isMobilePortrait ? 'max-w-[190px]' : 'max-w-[140px] sm:max-w-xl lg:max-w-4xl'}`}>
             {/* Settlement Stacks (Köy -> Şehir -> Büyükşehir) */}
             {youArea?.stacks.map((stack, index) => {
               const isSettlement = stack.top === 'settlement';
@@ -633,7 +685,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   scale={playerCardScale}
                   baseWidth={125}
                   baseHeight={194}
-                  isDraggable={true}
+                  isDraggable={!isMobile}
                   position={cardPositions[stack.id]}
                   zIndex={cardZIndices[stack.id]}
                   onBringToFront={() => bringToFront(stack.id)}
@@ -666,7 +718,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   scale={playerCardScale}
                   baseWidth={125}
                   baseHeight={194}
-                  isDraggable={true}
+                  isDraggable={!isMobile}
                   position={cardPositions[cardId] || cardPositions[`you-road-${i}`]}
                   zIndex={cardZIndices[cardId] || cardZIndices[`you-road-${i}`]}
                   onBringToFront={() => bringToFront(cardId)}
@@ -699,7 +751,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   scale={playerCardScale}
                   baseWidth={125}
                   baseHeight={194}
-                  isDraggable={true}
+                  isDraggable={!isMobile}
                   position={cardPositions[cardId] || cardPositions[`you-knight-${i}`]}
                   zIndex={cardZIndices[cardId] || cardZIndices[`you-knight-${i}`]}
                   onBringToFront={() => bringToFront(cardId)}
@@ -721,7 +773,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 scale={playerCardScale}
                 baseWidth={186}
                 baseHeight={120}
-                isDraggable={true}
+                isDraggable={!isMobile}
                 position={
                   cardPositions[`${view.you}-bonus-longest-route`] ||
                   cardPositions['bonus-longest-route']
@@ -756,7 +808,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 scale={playerCardScale}
                 baseWidth={186}
                 baseHeight={120}
-                isDraggable={true}
+                isDraggable={!isMobile}
                 position={
                   cardPositions[`${view.you}-bonus-largest-army`] ||
                   cardPositions['bonus-largest-army']
@@ -799,19 +851,18 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               onInspectCard={onInspectCard}
               scale={playerHandScale}
             />
-            {!isMobileLandscape && (
-              <PlayerNameplate
-                name={youPlayer?.name || 'Sen'}
-                isTurn={isActive}
-                isMe={true}
-                victoryPoints={youPlayer?.visibleVP ?? 0}
-                hasLongestRoute={youHasRoute}
-                hasLargestArmy={youHasArmy}
-                cardCount={Object.values(view.yourHand ?? {}).reduce((a, b) => a + b, 0)}
-                align="right"
-                className="mt-0.5 sm:mt-1"
-              />
-            )}
+            <PlayerNameplate
+              name={youPlayer?.name || 'Sen'}
+              isTurn={isActive}
+              isMe={true}
+              victoryPoints={youPlayer?.visibleVP ?? 0}
+              hasLongestRoute={youHasRoute}
+              hasLargestArmy={youHasArmy}
+              cardCount={Object.values(view.yourHand ?? {}).reduce((a, b) => a + b, 0)}
+              align="right"
+              compact={isMobilePortrait}
+              className="mt-0.5 sm:mt-1"
+            />
           </div>
         </div>
       </GameMat>

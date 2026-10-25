@@ -19,6 +19,7 @@ import { RobberModal } from './components/RobberModal.tsx';
 import { TradeModal } from './components/TradeModal.tsx';
 import { getCardDetails, type CardDetails } from './lib/cardImages.ts';
 import { ensureAnonymousAuth, invokeEdgeFunction, supabase } from './lib/supabase.ts';
+import { useFullscreen } from './lib/useFullscreen.ts';
 
 export const App: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
@@ -35,10 +36,25 @@ export const App: React.FC = () => {
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [eventNotification, setEventNotification] = useState<string | null>(null);
-  const [showOrientationTip, setShowOrientationTip] = useState<boolean>(() => {
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const [isPortraitMode, setIsPortraitMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth < 640 && window.innerHeight > window.innerWidth;
+    return window.innerWidth < 768 && window.innerHeight > window.innerWidth;
   });
+  const [bypassPortraitWarning, setBypassPortraitWarning] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const isPortrait = window.innerWidth < 768 && window.innerHeight > window.innerWidth;
+      setIsPortraitMode(isPortrait);
+    };
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, []);
 
   // 1. Anonim Oturum Başlatma
   useEffect(() => {
@@ -305,22 +321,40 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mobil Dikey İpucu */}
-      {isGameActive && showOrientationTip && (
-        <aside
-          aria-label="Cihaz Yönlendirme İpucu"
-          className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-slate-950/90 text-amber-300 text-[11px] sm:text-xs px-3 py-1.5 rounded-full border border-amber-500/50 shadow-2xl flex items-center gap-2 backdrop-blur-md animate-in fade-in select-none pointer-events-auto"
-        >
-          <span>📱 Geniş masa deneyimi için cihazınızı yatay çevirebilirsiniz</span>
-          <button
-            type="button"
-            onClick={() => setShowOrientationTip(false)}
-            aria-label="İpucunu Kapat"
-            className="text-slate-400 hover:text-white font-bold ml-1 px-1 rounded hover:bg-white/10"
-          >
-            ✕
-          </button>
-        </aside>
+      {/* Mobil Dikey Mod Engeli & Yatay Mod Yönlendirmesi */}
+      {isGameActive && isPortraitMode && !bypassPortraitWarning && (
+        <div className="fixed inset-0 z-50 bg-[#150103] flex flex-col items-center justify-center p-6 text-center select-none backdrop-blur-lg animate-in fade-in">
+          <div className="relative mb-6">
+            <div className="w-20 h-20 rounded-2xl border-2 border-amber-500/60 bg-amber-950/40 flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.35)] animate-pulse">
+              <span className="text-4xl">📱</span>
+            </div>
+            <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-black text-lg animate-bounce shadow-md">
+              🔄
+            </div>
+          </div>
+          <h2 className="text-xl font-black text-amber-400 mb-2 tracking-wide uppercase">
+            Cihazınızı Yatay Çevirin
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-xs leading-relaxed mb-6">
+            CATAN – On the Road geniş masa ve büyük kartlar için <strong>yatay ekranda</strong> oynanır.
+          </p>
+          <div className="flex flex-col gap-2.5 w-full max-w-xs">
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-lg hover:brightness-110 text-xs transition"
+            >
+              <span>⛶ Tam Ekran Yap ve Çevir</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBypassPortraitWarning(true)}
+              className="text-[11px] text-slate-500 hover:text-slate-300 underline transition py-1"
+            >
+              Yine de dikey devam et
+            </button>
+          </div>
+        </div>
       )}
 
       {!isGameActive ? (

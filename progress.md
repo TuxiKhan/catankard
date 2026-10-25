@@ -3,13 +3,78 @@
 > Master Orchestrator tarafından tutulur. Her adımda güncellenir.
 
 ## Durum Özeti
-- **Aşama:** STEP 17 – Mobil Dokunmatik Mekanikleri, Kart Detay İnceleme & Takas Sayacı İyileştirmeleri
+- **Aşama:** STEP 20 – Mobil Dikey İsimliklerin Küçültülmesi & Kart Boyutlarının Dikeyde Büyütülmesi
 - **Repo:** https://github.com/TuxiKhan/catankard (public)
 - **Supabase:** `catan game` · ref `oykohkhaptgyeeeyauon` · eu-west-1 (Edge Functions v4 deployed)
 - **Canlı Test:** `http://localhost:5173/` (Vite dev server aktif)
 - **Son güncelleme:** 2026-10-25
 
-## Mobil Dokunmatik Mekanikleri & Kart İnceleme Çözümleri (STEP 17)
+## Mobil Dikey İsimliklerin Küçültülmesi & Kart Boyutlarının Dikeyde Büyütülmesi (STEP 20)
+1. **Dikey Modda İsimliklerin Küçültülmesi ([PlayerNameplate.tsx](file:///C:/A/kode/catankard/apps/web/src/components/PlayerNameplate.tsx)):**
+   - `compact?: boolean` prop'u eklendi; dikey modda (`isMobilePortrait`) isim plakaları kompakt mikro boyuta çekildi (`compact={isMobilePortrait}`).
+   - İsim fontu `text-[10px]`, ZP rozeti `text-[9px]`, kart sayısı `🎴 text-[9px]` ve plaka padding'i `px-1.5 py-0.5` olarak dengelendi.
+   - İsimlikler dikey ekranda devasa yer kaplamaktan kurtarılarak incecik, zarif ve okunaklı hale getirildi.
+2. **Dikey Modda Kart Boyutlarının Büyütülmesi ([useResponsiveLayout.ts](file:///C:/A/kode/catankard/apps/web/src/lib/useResponsiveLayout.ts)):**
+   - Dikey modda kartlar daha belirgin ve okunaklı olacak şekilde dengeli bir oranda büyütüldü:
+     - Oyuncunun masa kartları: `0.38` -> `0.43`
+     - Eldeki kaynak kartları: `0.38` -> `0.42`
+     - Pazar/Market kartları: `0.35` -> `0.38`
+     - Rakiplerin kartları & elleri: `0.35/0.34` -> `0.38/0.37`
+   - Yatay mod ve PC moduna kesinlikle dokunulmadı; daha önce beğenilen yatay mod düzeni ve PC ekranı aynen korundu.
+3. **Kapsamlı Test & Ekran Görüntüsü Doğrulaması:**
+   - **Playwright Doğrulaması:**
+     - Mobil Dikey: [scratch/mobile_portrait.png](file:///C:/A/kode/catankard/scratch/mobile_portrait.png) (İsimler kompakt, kartlar belirgin ve ferah).
+     - Mobil Yatay: [scratch/mobile_landscape.png](file:///C:/A/kode/catankard/scratch/mobile_landscape.png) (Yatay mod korundu).
+     - PC Masaüstü: [scratch/desktop_pc_verified.png](file:///C:/A/kode/catankard/scratch/desktop_pc_verified.png) (PC modundan hiçbir şey eksilmedi).
+   - **Birim Testleri (`npm test`):** 33/33 test başarılı.
+   - **Proje Derlemesi (`npm run build`):** TypeScript ve Vite sıfır hata ile tamamlandı.
+
+## Mobilde Üst Tablo Barının Kaldırılması & İsimliklerin Zafer Puanıyla Masaya Yerleşimi (STEP 19)
+1. **Mobilde Üst Tablo Barının Kaldırılması:**
+   - [GameDesk4P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk4P.tsx) ve [GameDesk3P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk3P.tsx) içerisindeki büyük `<header>` tablo barı mobilde (`${isMobile ? 'hidden' : 'flex'}`) tamamen kaldırıldı.
+   - **PC modunda kesinlikle hiçbir şey eksiltilmedi:** PC (masaüstü) modunda orijinal Catan 4P üst tablo barı, 4 oyuncunun skorları, sayaç ve butonlar birebir yerinde duruyor ([desktop_pc_verified.png](file:///C:/A/kode/catankard/scratch/desktop_pc_verified.png)).
+   - Mobilde ekranı ve kartları kapatmayan minimalist mikro rozet (`Tur #1 • Sende • ⏱ 56s • ⛶ • 🚪`) eklendi; böylece oyun akışı, süre ve butonlar mobilde de eksiksiz erişilebilir kaldı.
+2. **Mobilde (Öncelikli Yatay Modda) İsimlerin Yanına Zafer Puanı Eklenmesi:**
+   - [PlayerNameplate.tsx](file:///C:/A/kode/catankard/apps/web/src/components/PlayerNameplate.tsx) bileşenlerini yatay modda gizleyen `{!isMobileLandscape && (` kısıtlamaları 4P ve 3P masalarında tüm oyuncular için kaldırıldı.
+   - Mobilde (hem yatay hem dikey modda) masanın 4 köşesindeki tüm oyuncu isimlikleri PC'deki gibi estetik, mavi neon ışıklı, kart sayılı ve altın madalyonlu Zafer Puanı (`ZP`) rozetiyle birlikte görünür hale getirildi.
+   - Üst barın kalkmasıyla `pt-1 sm:pt-10` düzenine geçilerek üstteki oyuncu isimlikleri ve kartları masanın en tepesine pürüzsüzce yerleşti, dikeyde masanın ortasındaki pazar alanına ferah alan açıldı ([mobile_landscape.png](file:///C:/A/kode/catankard/scratch/mobile_landscape.png)).
+3. **Kapsamlı Test & Ekran Görüntüsü Doğrulaması:**
+   - **Playwright Doğrulaması:**
+     - Mobil Yatay: [scratch/mobile_landscape.png](file:///C:/A/kode/catankard/scratch/mobile_landscape.png) (Üst bar kalktı, isimler ve ZP rozetleri PC kalitesinde yerleşti).
+     - Mobil Dikey: [scratch/mobile_portrait.png](file:///C:/A/kode/catankard/scratch/mobile_portrait.png)
+     - PC Masaüstü: [scratch/desktop_pc_verified.png](file:///C:/A/kode/catankard/scratch/desktop_pc_verified.png) (PC modundan hiçbir şey eksilmediği doğrulandı).
+   - **Birim Testleri (`npm test`):** 33/33 test başarılı.
+   - **Proje Derlemesi (`npm run build`):** TypeScript ve Vite sıfır hata ile derlendi.
+
+## Mobil UI Balans Ayarı, Kart Boyut Optimizasyonu & Chrome Tam Ekran Çözümü (STEP 18)
+1. **Chrome Mobilde Üst URL Çubuğunu Kapatma & Gerçek Tam Ekran (Fullscreen):**
+   - **PWA Desteği ([manifest.json](file:///C:/A/kode/catankard/apps/web/public/manifest.json)):** `display: "standalone"`, `#150103` tema rengi ve Catan ikonları tanımlandı. Ana ekrana eklendiğinde veya PWA olarak açıldığında tarayıcı URL barı tamamen ortadan kalkar.
+   - **Meta & Viewport Yapılandırması ([index.html](file:///C:/A/kode/catankard/apps/web/index.html)):** `viewport-fit=cover`, `mobile-web-app-capable: yes`, `apple-mobile-web-app-status-bar-style: black-translucent` ve `theme-color: #150103` tanımlandı.
+   - **Dinamik Viewport & Overscroll Engellemesi ([index.css](file:///C:/A/kode/catankard/apps/web/src/index.css)):** `height: 100dvh`, `min-height: 100dvh`, `overscroll-behavior: none` ve `touch-action: manipulation` kuralları eklenerek parmakla kaydırmada adres çubuğunun yeniden aşağı inmesi önlendi.
+   - **Tam Ekran Hook'u ([useFullscreen.ts](file:///C:/A/kode/catankard/apps/web/src/lib/useFullscreen.ts)):** HTML5 Fullscreen API ile cross-browser (WebKit / iOS / Android) tam ekran kontrolü sağlandı.
+   - **Tek Dokunuşla Tam Ekran Butonları ([GameDesk4P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk4P.tsx), [GameDesk3P.tsx](file:///C:/A/kode/catankard/apps/web/src/components/GameDesk3P.tsx), [App.tsx](file:///C:/A/kode/catankard/apps/web/src/App.tsx)):** Üst oyun header'ına `Maximize`/`Minimize` toggle butonu ve mobil oryantasyon ipucu bandına tek tıkla "⛶ Tam Ekran" yapma butonu eklendi. Dokunulduğu anda Chrome URL barı yukarı kayarak kaybolur.
+2. **Mobilde Kart Boyutlarının Küçültülmesi & Balans Ayarı ([useResponsiveLayout.ts](file:///C:/A/kode/catankard/apps/web/src/lib/useResponsiveLayout.ts)):**
+   - **Masaüstü (PC) Boyutlarına Kesinlikle Dokunulmadı:** Masaüstünde ve büyük ekranlarda kartların ölçekleri (%100 ve %78/0.95) aynen korundu.
+   - **Mobil Dikey (Portrait):**
+     - Oyuncunun masa kartları: `0.48 -> 0.38` (ferahlık sağlandı)
+     - Eldeki kaynak kartları: `0.52 -> 0.38` (yükseklik ~110px'ten ~60px'e indi, butonların üstünü kapatması önlendi)
+     - Pazar/Market kartları: `0.40 -> 0.35`
+     - Rakip kartları & elleri: `0.44 -> 0.35 / 0.34`
+   - **Mobil Yatay (Landscape):**
+     - Masa ve el kartları: `0.46/0.48 -> 0.38`
+     - Pazar ve rakip kartları: `0.44/0.40 -> 0.38 / 0.34`
+3. **Mobilde Yere Kart Koymada Hareketlerin İptal Edilmesi ([TableCard.tsx](file:///C:/A/kode/catankard/apps/web/src/components/TableCard.tsx), [CardStack.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardStack.tsx)):**
+   - Kendi masa kartlarına `isDraggable={!isMobile}` kuralı uygulandı.
+   - Mobilde serbest sürükleme kapatılarak kartların parmak dokunuşunda kayması, ekran dışına kaçması ve karmaşa yaratması tamamen engellendi.
+   - Mobilde kartlar kendi flex yuvalarında nizamî ve sabit kalır (`currentX = 0, currentY = 0`). Masaüstünde ise serbest sürükleme (`isDraggable: true`) aynen çalışmaya devam eder.
+   - Mobilde kart detayını inceleme (tek dokunuş veya uzun basma) fonksiyonu pürüzsüzce çalışır.
+4. **Mobil Yerleşim & Çakışma Düzeltmeleri:**
+   - Yerdeki kart konteyneri mobilde `max-w-[190px]` yapılarak Köy ve Yol kartlarının alt alta değil, yan yana derli toplu durması sağlandı.
+   - Aksiyon butonları `isMobilePortrait` modunda `left-[38%]` konumuna dengelenerek sağdaki `Sen (Sina)` isimliği ile aralarında ~30px temiz boşluk oluşturuldu.
+5. **Kapsamlı Test & Ekran Görüntüsü Doğrulaması:**
+   - **Playwright Mobil Emülasyonu ([scratch/test_browser_mobile.ts](file:///C:/A/kode/catankard/scratch/test_browser_mobile.ts)):** Hem Mobil Portre ([scratch/mobile_portrait.png](file:///C:/A/kode/catankard/scratch/mobile_portrait.png)) hem Mobil Yatay ([scratch/mobile_landscape.png](file:///C:/A/kode/catankard/scratch/mobile_landscape.png)) ekran görüntüleri çekildi ve görsel olarak doğrulandı.
+   - **Birim Testleri (`npm test`):** 33/33 test başarıyla geçti.
+   - **Proje Derlemesi (`npm run build`):** TypeScript ve Vite derlemesi sıfır hata ile tamamlandı.
 1. **Mobilde Sağ Tık Olmaması Sorununun Çözülmesi & Çok Kanallı İnceleme:**
    - **Eldeki Kaynak Kartları ([FannedHand.tsx](file:///C:/A/kode/catankard/apps/web/src/components/FannedHand.tsx)):** Normal oyunda eldeki herhangi bir kaynak kartına dokunulduğunda doğrudan kart inceleme modalı ([CardModal.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardModal.tsx)) açılır. Ayrıca 450ms uzun basma haptik titreşim (`navigator.vibrate`) desteği ve dokunmatik `(i)` butonu eklendi.
    - **Masadaki Kartlar ([TableCard.tsx](file:///C:/A/kode/catankard/apps/web/src/components/TableCard.tsx) & [CardStack.tsx](file:///C:/A/kode/catankard/apps/web/src/components/CardStack.tsx)):** Masada sürükleme ve yığma eylemlerini bozmadan her kartın ve yığının sağ üst köşesine dokunmatik Detay `(i)` butonu eklendi. Karta 450ms basılı tutulduğunda titreşimle detay modalı açılır. Rakip kartlarına tek tık doğrudan detay açar.

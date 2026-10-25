@@ -93,9 +93,37 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   };
 
   const isCompact = scale <= 0.68;
-  const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const [windowDimensions, setWindowDimensions] = useState(() => ({
+    winWidth: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    winHeight: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setWindowDimensions({
+        winWidth: window.innerWidth,
+        winHeight: window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  const { winWidth, winHeight } = windowDimensions;
   const isMobilePortrait = winWidth < 640 && winHeight > winWidth;
+  const isMobileLandscape = winHeight <= 520 && winWidth >= 500;
+
+  // Kapalı desteler mobilde daha kompakt olsun, açık kartlar ise büyük ve oynanabilir kalsın
+  const isDeckCompact = isMobileLandscape || isMobilePortrait;
+  const deckScale = isDeckCompact ? scale * 0.72 : scale;
+  const deckW = Math.round(125 * deckScale);
+  const deckH = Math.round(194 * deckScale);
+  const bonusDeckW = Math.round(bonusBaseW * deckScale);
+  const bonusDeckContainerH = Math.round((hasBothBonuses ? bonusBaseH + bonusShiftY : bonusBaseH) * deckScale);
 
   const renderResourceDeck = () => (
     <div
@@ -107,7 +135,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
       }}
     >
       <div
-        style={{ width: `${cardW}px`, height: `${cardH}px` }}
+        style={{ width: `${deckW}px`, height: `${deckH}px` }}
         className="relative rounded-lg sm:rounded-xl overflow-hidden border border-amber-800/80 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-amber-900/60 bg-amber-950"
       >
         <div className="absolute inset-0 bg-amber-900/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
@@ -134,7 +162,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
       }}
     >
       <div
-        style={{ width: `${cardW}px`, height: `${cardH}px` }}
+        style={{ width: `${deckW}px`, height: `${deckH}px` }}
         className="relative rounded-lg sm:rounded-xl overflow-hidden border border-slate-700 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-slate-800 bg-slate-950"
       >
         <div className="absolute inset-0 bg-slate-800/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
@@ -154,7 +182,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   const renderBuildingDeck = () => (
     <div
       className="relative rounded-lg sm:rounded-xl overflow-hidden border border-emerald-600/70 shadow-lg cursor-pointer group transition-transform hover:-translate-y-0.5 bg-emerald-950 shrink-0"
-      style={{ width: `${cardW}px`, height: `${cardH}px` }}
+      style={{ width: `${deckW}px`, height: `${deckH}px` }}
       onClick={() => setBrowsingDeck('building')}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -182,7 +210,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] hover:scale-105 cursor-pointer'
             : 'border-amber-900/40 opacity-90 hover:opacity-100 hover:border-amber-700/60 hover:scale-[1.02] cursor-pointer'
         }`}
-        style={{ width: `${cardW}px`, height: `${cardH}px` }}
+        style={{ width: `${deckW}px`, height: `${deckH}px` }}
         onPointerDown={handleMetroPointerDown}
         onPointerMove={handleMetroPointerMove}
         onPointerUp={handleMetroPointerUp}
@@ -281,8 +309,8 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
         <div
           className="relative"
           style={{
-            width: `${bonusContainerW}px`,
-            height: `${bonusContainerH}px`,
+            width: `${bonusDeckW}px`,
+            height: `${bonusDeckContainerH}px`,
           }}
         >
           {hasRouteBonus && (
@@ -297,7 +325,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
               <TableCard
                 id="table-bonus-longest-route"
                 type="longest_route"
-                scale={scale}
+                scale={deckScale}
                 baseWidth={bonusBaseW}
                 baseHeight={bonusBaseH}
                 onInspect={() => onInspectCard('longest_route')}
@@ -312,14 +340,14 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
                   : 'z-20 hover:z-30 hover:-translate-y-1'
               }`}
               style={{
-                top: hasBothBonuses ? `${Math.round(bonusShiftY * scale)}px` : 0,
+                top: hasBothBonuses ? `${Math.round(bonusShiftY * deckScale)}px` : 0,
               }}
               title="En Güçlü Ordu (2 Zafer Puanı)"
             >
               <TableCard
                 id="table-bonus-largest-army"
                 type="largest_army"
-                scale={scale}
+                scale={deckScale}
                 baseWidth={bonusBaseW}
                 baseHeight={bonusBaseH}
                 onInspect={() => onInspectCard('largest_army')}
@@ -351,8 +379,27 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
             </div>
           </div>
         </div>
+      ) : isMobileLandscape ? (
+        /* MOBİL YATAY (LANDSCAPE): Kenar Oyunculara Çarpmayan 2 Sıralı Büyük Kart Düzeni */
+        <div className="flex flex-col items-center justify-center select-none relative mt-2 mb-0.5 gap-1 max-w-[480px] mx-auto z-10">
+          {/* Üst Sıra: Kapalı Desteler & Bonuslar (Genişlik: ~360px) */}
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+            {renderResourceDeck()}
+            {renderEventDeck()}
+            {renderBuildingDeck()}
+            {renderMetropolisStack()}
+            {renderBonusCards()}
+          </div>
+
+          {/* Alt Sıra: BÜYÜK VE OKUNAKLI 5 AÇIK İNŞAAT KARTI YUVASI */}
+          <div className="relative border-2 border-white/60 bg-black/40 backdrop-blur-xs shadow-2xl flex items-center justify-center rounded-xl px-2 py-1">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              {renderOpenBuildingCards()}
+            </div>
+          </div>
+        </div>
       ) : (
-        /* YATAY & MASAÜSTÜ MODU: Klasik Tek Sıra */
+        /* PC & MASAÜSTÜ MODU: Klasik Tek Sıra */
         <div
           className={`flex items-center justify-center select-none relative my-0.5 sm:my-2 ${
             isCompact ? 'gap-1.5 sm:gap-3' : 'gap-3 sm:gap-4 md:gap-6'

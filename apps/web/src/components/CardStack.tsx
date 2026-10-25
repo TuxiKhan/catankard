@@ -325,8 +325,8 @@ export const CardStack: React.FC<CardStackProps> = ({
     }
   };
 
-  const currentX = isDraggable ? (initialPosRef.current.x + dragOffset.x) : (position?.x ?? 0);
-  const currentY = isDraggable ? (initialPosRef.current.y + dragOffset.y) : (position?.y ?? 0);
+  const currentX = isDraggable ? (initialPosRef.current.x + dragOffset.x) : 0;
+  const currentY = isDraggable ? (initialPosRef.current.y + dragOffset.y) : 0;
   const hasCustomPos = currentX !== 0 || currentY !== 0;
 
   const transformStyle = hasCustomPos
