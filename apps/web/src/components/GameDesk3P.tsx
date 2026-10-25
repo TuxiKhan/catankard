@@ -9,6 +9,7 @@ import type { BuildingCard, MetropolisCard, PlayerView, Resource } from '@catank
 import { BuildingRowMat } from './BuildingRowMat.tsx';
 import { CardStack } from './CardStack.tsx';
 import { TableCard } from './TableCard.tsx';
+import { StackedTableCards } from './StackedTableCards.tsx';
 import { FannedHand } from './FannedHand.tsx';
 import { GameMat } from './GameMat.tsx';
 import { PlayerNameplate } from './PlayerNameplate.tsx';
@@ -460,42 +461,74 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     />
                   ))}
 
-                  {/* Road Cards (1 Başlangıç Yolu + İnşa Edilen Yollar) */}
-                  {Array.from({ length: oppLeftRoadsCount }).map((_, i) => {
-                    const cardId = `${oppLeft}-road-${i}`;
-                    return (
-                      <TableCard
-                        key={cardId}
-                        id={cardId}
-                        type="road"
-                        isStarting={i === 0}
-                        scale={opponentCardScale}
-                        baseWidth={125}
-                        baseHeight={194}
-                        position={positionsByPlayer[oppLeft]?.[cardId]}
-                        zIndex={cardZIndices[cardId]}
-                        onInspect={() => onInspectCard('road')}
-                      />
-                    );
-                  })}
+                  {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {isMobile ? (
+                    <StackedTableCards
+                      idPrefix={`${oppLeft}-roads`}
+                      type="road"
+                      count={oppLeftRoadsCount}
+                      scale={opponentCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      layerOffset={30}
+                      isDraggable={false}
+                      position={positionsByPlayer[oppLeft]?.[`${oppLeft}-road-0`]}
+                      zIndex={cardZIndices[`${oppLeft}-road-0`]}
+                      onInspect={() => onInspectCard('road')}
+                    />
+                  ) : (
+                    Array.from({ length: oppLeftRoadsCount }).map((_, i) => {
+                      const cardId = `${oppLeft}-road-${i}`;
+                      return (
+                        <TableCard
+                          key={cardId}
+                          id={cardId}
+                          type="road"
+                          isStarting={i === 0}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppLeft]?.[cardId]}
+                          zIndex={cardZIndices[cardId]}
+                          onInspect={() => onInspectCard('road')}
+                        />
+                      );
+                    })
+                  )}
 
-                  {/* Knight Cards */}
-                  {Array.from({ length: oppLeftKnightsCount }).map((_, i) => {
-                    const cardId = `${oppLeft}-knight-${i}`;
-                    return (
-                      <TableCard
-                        key={cardId}
-                        id={cardId}
-                        type="knight"
-                        scale={opponentCardScale}
-                        baseWidth={125}
-                        baseHeight={194}
-                        position={positionsByPlayer[oppLeft]?.[cardId]}
-                        zIndex={cardZIndices[cardId]}
-                        onInspect={() => onInspectCard('knight')}
-                      />
-                    );
-                  })}
+                  {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {isMobile ? (
+                    <StackedTableCards
+                      idPrefix={`${oppLeft}-knights`}
+                      type="knight"
+                      count={oppLeftKnightsCount}
+                      scale={opponentCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      layerOffset={30}
+                      isDraggable={false}
+                      position={positionsByPlayer[oppLeft]?.[`${oppLeft}-knight-0`]}
+                      zIndex={cardZIndices[`${oppLeft}-knight-0`]}
+                      onInspect={() => onInspectCard('knight')}
+                    />
+                  ) : (
+                    Array.from({ length: oppLeftKnightsCount }).map((_, i) => {
+                      const cardId = `${oppLeft}-knight-${i}`;
+                      return (
+                        <TableCard
+                          key={cardId}
+                          id={cardId}
+                          type="knight"
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppLeft]?.[cardId]}
+                          zIndex={cardZIndices[cardId]}
+                          onInspect={() => onInspectCard('knight')}
+                        />
+                      );
+                    })
+                  )}
 
                   {/* Bonus Kartlar */}
                   {oppLeftHasRoute && (
@@ -570,42 +603,74 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     />
                   ))}
 
-                  {/* Road Cards */}
-                  {Array.from({ length: oppRightRoadsCount }).map((_, i) => {
-                    const cardId = `${oppRight}-road-${i}`;
-                    return (
-                      <TableCard
-                        key={cardId}
-                        id={cardId}
-                        type="road"
-                        isStarting={i === 0}
-                        scale={opponentCardScale}
-                        baseWidth={125}
-                        baseHeight={194}
-                        position={positionsByPlayer[oppRight]?.[cardId]}
-                        zIndex={cardZIndices[cardId]}
-                        onInspect={() => onInspectCard('road')}
-                      />
-                    );
-                  })}
+                  {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {isMobile ? (
+                    <StackedTableCards
+                      idPrefix={`${oppRight}-roads`}
+                      type="road"
+                      count={oppRightRoadsCount}
+                      scale={opponentCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      layerOffset={30}
+                      isDraggable={false}
+                      position={positionsByPlayer[oppRight]?.[`${oppRight}-road-0`]}
+                      zIndex={cardZIndices[`${oppRight}-road-0`]}
+                      onInspect={() => onInspectCard('road')}
+                    />
+                  ) : (
+                    Array.from({ length: oppRightRoadsCount }).map((_, i) => {
+                      const cardId = `${oppRight}-road-${i}`;
+                      return (
+                        <TableCard
+                          key={cardId}
+                          id={cardId}
+                          type="road"
+                          isStarting={i === 0}
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppRight]?.[cardId]}
+                          zIndex={cardZIndices[cardId]}
+                          onInspect={() => onInspectCard('road')}
+                        />
+                      );
+                    })
+                  )}
 
-                  {/* Knight Cards */}
-                  {Array.from({ length: oppRightKnightsCount }).map((_, i) => {
-                    const cardId = `${oppRight}-knight-${i}`;
-                    return (
-                      <TableCard
-                        key={cardId}
-                        id={cardId}
-                        type="knight"
-                        scale={opponentCardScale}
-                        baseWidth={125}
-                        baseHeight={194}
-                        position={positionsByPlayer[oppRight]?.[cardId]}
-                        zIndex={cardZIndices[cardId]}
-                        onInspect={() => onInspectCard('knight')}
-                      />
-                    );
-                  })}
+                  {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de geniş yan yana */}
+                  {isMobile ? (
+                    <StackedTableCards
+                      idPrefix={`${oppRight}-knights`}
+                      type="knight"
+                      count={oppRightKnightsCount}
+                      scale={opponentCardScale}
+                      baseWidth={125}
+                      baseHeight={194}
+                      layerOffset={30}
+                      isDraggable={false}
+                      position={positionsByPlayer[oppRight]?.[`${oppRight}-knight-0`]}
+                      zIndex={cardZIndices[`${oppRight}-knight-0`]}
+                      onInspect={() => onInspectCard('knight')}
+                    />
+                  ) : (
+                    Array.from({ length: oppRightKnightsCount }).map((_, i) => {
+                      const cardId = `${oppRight}-knight-${i}`;
+                      return (
+                        <TableCard
+                          key={cardId}
+                          id={cardId}
+                          type="knight"
+                          scale={opponentCardScale}
+                          baseWidth={125}
+                          baseHeight={194}
+                          position={positionsByPlayer[oppRight]?.[cardId]}
+                          zIndex={cardZIndices[cardId]}
+                          onInspect={() => onInspectCard('knight')}
+                        />
+                      );
+                    })
+                  )}
 
                   {/* Bonus Kartlar */}
                   {oppRightHasRoute && (
@@ -697,72 +762,104 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               );
             })}
 
-            {/* Road Cards (1 Başlangıç Yolu + İnşa Edilen Yollar) */}
-            {Array.from({ length: youRoadsCount }).map((_, i) => {
-              const cardId = `${view.you}-road-${i}`;
-              const slotIdx = (youArea?.stacks.length ?? 1) + i;
-              const clampFn = createSafeZoneClamper({
-                layout: '3P',
-                handPosition: 'bottom-center',
-                slotIndex: slotIdx,
-                totalSlots: totalYouCards,
-                cardWidth: Math.round(125 * playerCardScale),
-              });
+            {/* Road Cards: Mobilde dikey basamaklı paket (istif), PC'de serbest sürüklenebilir kartlar */}
+            {isMobile ? (
+              <StackedTableCards
+                idPrefix={`${view.you}-roads`}
+                type="road"
+                count={youRoadsCount}
+                scale={playerCardScale}
+                baseWidth={125}
+                baseHeight={194}
+                layerOffset={30}
+                isDraggable={false}
+                position={cardPositions[`${view.you}-road-0`] || cardPositions['you-road-0']}
+                zIndex={cardZIndices[`${view.you}-road-0`] || cardZIndices['you-road-0']}
+                onInspect={() => onInspectCard('road')}
+              />
+            ) : (
+              Array.from({ length: youRoadsCount }).map((_, i) => {
+                const cardId = `${view.you}-road-${i}`;
+                const slotIdx = (youArea?.stacks.length ?? 1) + i;
+                const clampFn = createSafeZoneClamper({
+                  layout: '3P',
+                  handPosition: 'bottom-center',
+                  slotIndex: slotIdx,
+                  totalSlots: totalYouCards,
+                  cardWidth: Math.round(125 * playerCardScale),
+                });
 
-              return (
-                <TableCard
-                  key={cardId}
-                  id={cardId}
-                  type="road"
-                  isStarting={i === 0}
-                  scale={playerCardScale}
-                  baseWidth={125}
-                  baseHeight={194}
-                  isDraggable={!isMobile}
-                  position={cardPositions[cardId] || cardPositions[`you-road-${i}`]}
-                  zIndex={cardZIndices[cardId] || cardZIndices[`you-road-${i}`]}
-                  onBringToFront={() => bringToFront(cardId)}
-                  onPositionChange={(pos) => updateCardPosition(cardId, pos)}
-                  onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
-                  onDragChange={setIsCardDragging}
-                  clampPosition={clampFn}
-                  onInspect={() => onInspectCard('road')}
-                />
-              );
-            })}
+                return (
+                  <TableCard
+                    key={cardId}
+                    id={cardId}
+                    type="road"
+                    isStarting={i === 0}
+                    scale={playerCardScale}
+                    baseWidth={125}
+                    baseHeight={194}
+                    isDraggable={true}
+                    position={cardPositions[cardId] || cardPositions[`you-road-${i}`]}
+                    zIndex={cardZIndices[cardId] || cardZIndices[`you-road-${i}`]}
+                    onBringToFront={() => bringToFront(cardId)}
+                    onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                    onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
+                    onDragChange={setIsCardDragging}
+                    clampPosition={clampFn}
+                    onInspect={() => onInspectCard('road')}
+                  />
+                );
+              })
+            )}
 
-            {/* Knight Cards (İnşa Edilen Şövalyeler) */}
-            {Array.from({ length: youKnightsCount }).map((_, i) => {
-              const cardId = `${view.you}-knight-${i}`;
-              const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
-              const clampFn = createSafeZoneClamper({
-                layout: '3P',
-                handPosition: 'bottom-center',
-                slotIndex: slotIdx,
-                totalSlots: totalYouCards,
-                cardWidth: Math.round(125 * playerCardScale),
-              });
+            {/* Knight Cards: Mobilde dikey basamaklı paket (istif), PC'de serbest sürüklenebilir kartlar */}
+            {isMobile ? (
+              <StackedTableCards
+                idPrefix={`${view.you}-knights`}
+                type="knight"
+                count={youKnightsCount}
+                scale={playerCardScale}
+                baseWidth={125}
+                baseHeight={194}
+                layerOffset={30}
+                isDraggable={false}
+                position={cardPositions[`${view.you}-knight-0`] || cardPositions['you-knight-0']}
+                zIndex={cardZIndices[`${view.you}-knight-0`] || cardZIndices['you-knight-0']}
+                onInspect={() => onInspectCard('knight')}
+              />
+            ) : (
+              Array.from({ length: youKnightsCount }).map((_, i) => {
+                const cardId = `${view.you}-knight-${i}`;
+                const slotIdx = (youArea?.stacks.length ?? 1) + youRoadsCount + i;
+                const clampFn = createSafeZoneClamper({
+                  layout: '3P',
+                  handPosition: 'bottom-center',
+                  slotIndex: slotIdx,
+                  totalSlots: totalYouCards,
+                  cardWidth: Math.round(125 * playerCardScale),
+                });
 
-              return (
-                <TableCard
-                  key={cardId}
-                  id={cardId}
-                  type="knight"
-                  scale={playerCardScale}
-                  baseWidth={125}
-                  baseHeight={194}
-                  isDraggable={!isMobile}
-                  position={cardPositions[cardId] || cardPositions[`you-knight-${i}`]}
-                  zIndex={cardZIndices[cardId] || cardZIndices[`you-knight-${i}`]}
-                  onBringToFront={() => bringToFront(cardId)}
-                  onPositionChange={(pos) => updateCardPosition(cardId, pos)}
-                  onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
-                  onDragChange={setIsCardDragging}
-                  clampPosition={clampFn}
-                  onInspect={() => onInspectCard('knight')}
-                />
-              );
-            })}
+                return (
+                  <TableCard
+                    key={cardId}
+                    id={cardId}
+                    type="knight"
+                    scale={playerCardScale}
+                    baseWidth={125}
+                    baseHeight={194}
+                    isDraggable={true}
+                    position={cardPositions[cardId] || cardPositions[`you-knight-${i}`]}
+                    zIndex={cardZIndices[cardId] || cardZIndices[`you-knight-${i}`]}
+                    onBringToFront={() => bringToFront(cardId)}
+                    onPositionChange={(pos) => updateCardPosition(cardId, pos)}
+                    onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
+                    onDragChange={setIsCardDragging}
+                    clampPosition={clampFn}
+                    onInspect={() => onInspectCard('knight')}
+                  />
+                );
+              })
+            )}
 
             {/* Bonus Kartlar (En Uzun Yol & En Güçlü Ordu) */}
             {youHasRoute && (
@@ -867,9 +964,10 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         </div>
       </GameMat>
 
-      {/* SAĞ ALT KÖŞE AKSİYON BUTONLARI (3 Kişilik Oyunda Sağ Altta: Ticaret & Turu Bitir) */}
+      {/* AKSİYON BUTONLARI (3 Kişilik Oyunda Mobilde Sol Altta, PC'de Sağ Altta: Ticaret & Turu Bitir) */}
       <TableActionButtons
         layout="3P"
+        className={isMobile ? 'fixed bottom-2 left-2 sm:bottom-4 sm:left-4 z-40' : undefined}
         onOpenTrade={onOpenTrade}
         onEndTurn={onEndTurn}
         isActive={isActive}

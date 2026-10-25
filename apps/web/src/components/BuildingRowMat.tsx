@@ -136,13 +136,13 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
     >
       <div
         style={{ width: `${deckW}px`, height: `${deckH}px` }}
-        className="relative rounded-lg sm:rounded-xl overflow-hidden border border-amber-800/80 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-amber-900/60 bg-amber-950"
+        className="relative rounded-md sm:rounded-lg overflow-hidden border border-amber-800/80 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-amber-900/60 bg-amber-950"
       >
-        <div className="absolute inset-0 bg-amber-900/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
+        <div className="absolute inset-0 bg-amber-900/40 rounded-md sm:rounded-lg translate-x-1 translate-y-1 -z-10" />
         <img
           src={assetUrl('/assets/cards/resource/resource_back.png')}
           alt="Kaynak Destesi"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           draggable={false}
         />
         <div className="absolute bottom-1 right-1 bg-black/85 text-amber-300 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-amber-600/40 pointer-events-none">
@@ -163,13 +163,13 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
     >
       <div
         style={{ width: `${deckW}px`, height: `${deckH}px` }}
-        className="relative rounded-lg sm:rounded-xl overflow-hidden border border-slate-700 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-slate-800 bg-slate-950"
+        className="relative rounded-md sm:rounded-lg overflow-hidden border border-slate-700 shadow-2xl transition-transform hover:-translate-y-1 hover:shadow-slate-800 bg-slate-950"
       >
-        <div className="absolute inset-0 bg-slate-800/40 rounded-xl translate-x-1 translate-y-1 -z-10" />
+        <div className="absolute inset-0 bg-slate-800/40 rounded-md sm:rounded-lg translate-x-1 translate-y-1 -z-10" />
         <img
           src={assetUrl('/assets/cards/event/event_back.png')}
           alt="Olay Destesi"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           draggable={false}
         />
         <div className="absolute bottom-1 right-1 bg-black/85 text-slate-200 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-slate-500/40 pointer-events-none">
@@ -189,11 +189,11 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
         setBrowsingDeck('building');
       }}
     >
-      <div className="absolute inset-0 bg-emerald-950/60 rounded-xl translate-x-0.5 translate-y-0.5 -z-10" />
+      <div className="absolute inset-0 bg-emerald-950/60 rounded-md sm:rounded-lg translate-x-0.5 translate-y-0.5 -z-10" />
       <img
         src={assetUrl('/assets/cards/building/building_back.png')}
         alt="İnşaat Kartı Destesi"
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain"
         draggable={false}
       />
       <div className="absolute bottom-1 right-1 bg-black/85 text-emerald-300 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.5 rounded shadow border border-emerald-500/40 pointer-events-none">
@@ -205,7 +205,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
   const renderMetropolisStack = () => (
     <div className="flex flex-col items-center gap-1 shrink-0">
       <div
-        className={`relative rounded-lg sm:rounded-xl overflow-hidden border transition-all duration-200 select-none ${
+        className={`relative rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 select-none ${
           canBuildMetro
             ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] hover:scale-105 cursor-pointer'
             : 'border-amber-900/40 opacity-90 hover:opacity-100 hover:border-amber-700/60 hover:scale-[1.02] cursor-pointer'
@@ -236,7 +236,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
           <img
             src={getMetropolisImageUrl(topMetro)}
             alt="Büyükşehir"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             draggable={false}
           />
         ) : (

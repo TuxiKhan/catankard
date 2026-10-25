@@ -374,7 +374,7 @@ export const CardStack: React.FC<CardStackProps> = ({
           left: 0,
           zIndex: 1,
         }}
-        className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-lg ${
+        className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-lg ${
           isSelected || isSelectable
             ? 'border-sky-400'
             : ''
@@ -383,7 +383,7 @@ export const CardStack: React.FC<CardStackProps> = ({
         <img
           src={getSettlementImgUrl()}
           alt="Köy"
-          className="w-full h-full object-cover pointer-events-none"
+          className="w-full h-full object-contain pointer-events-none"
           draggable={false}
           onError={(e) => {
             (e.currentTarget as HTMLElement).style.display = 'none';
@@ -401,7 +401,7 @@ export const CardStack: React.FC<CardStackProps> = ({
             left: 0,
             zIndex: 2,
           }}
-          className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-xl ${
+          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-xl ${
             isSelected
               ? 'border-yellow-400'
               : isSelectable
@@ -412,7 +412,7 @@ export const CardStack: React.FC<CardStackProps> = ({
           <img
             src={getBuildingImageUrl('city')}
             alt="Şehir"
-            className="w-full h-full object-cover pointer-events-none"
+            className="w-full h-full object-contain pointer-events-none"
             draggable={false}
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';
@@ -431,7 +431,7 @@ export const CardStack: React.FC<CardStackProps> = ({
             left: 0,
             zIndex: 3,
           }}
-          className={`absolute rounded-xl overflow-hidden border border-black/30 shadow-2xl ${
+          className={`absolute rounded-md sm:rounded-lg overflow-hidden border border-black/30 shadow-2xl ${
             isSelected || isSelectable
               ? 'border-sky-400'
               : ''
@@ -444,7 +444,7 @@ export const CardStack: React.FC<CardStackProps> = ({
                 : assetUrl('/assets/cards/building/metropolis_A.png')
             }
             alt="Büyükşehir"
-            className="w-full h-full object-cover pointer-events-none"
+            className="w-full h-full object-contain pointer-events-none"
             draggable={false}
             onError={(e) => {
               (e.currentTarget as HTMLElement).style.display = 'none';

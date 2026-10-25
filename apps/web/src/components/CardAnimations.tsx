@@ -594,20 +594,20 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
       >
         {/* ARKA YÜZ (Desteden kapalı kayarak gelen yüz - 0deg) */}
         <div
-          className="absolute inset-0 rounded-xl overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 backface-hidden"
+          className="absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 backface-hidden"
           style={{ transform: 'rotateY(0deg)' }}
         >
           <img
             src={assetUrl('/assets/cards/building/building_back.png')}
             alt="Kapalı Kart"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             draggable={false}
           />
         </div>
 
         {/* ÖN YÜZ (3D flip ile açılan bina kartı - 180deg) */}
         <div
-          className={`absolute inset-0 rounded-xl overflow-hidden border transition-all duration-200 backface-hidden ${
+          className={`absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 backface-hidden ${
             canAfford
               ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)]'
               : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50'
@@ -617,7 +617,7 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
           <img
             src={getBuildingImageUrl(card.type)}
             alt={card.type}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             draggable={false}
           />
 

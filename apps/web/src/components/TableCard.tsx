@@ -336,7 +336,7 @@ export const TableCard: React.FC<TableCardProps> = ({
         zIndex: isDragging ? 100 : (zIndex ?? (hasCustomPos ? 5 : 1)),
         touchAction: isDraggable ? 'none' : 'auto',
       }}
-      className={`relative select-none rounded-xl overflow-hidden shadow-lg border border-black/25 transition-shadow ${
+      className={`relative select-none rounded-md sm:rounded-lg overflow-hidden shadow-lg border border-black/25 transition-shadow ${
         isDragging
           ? 'cursor-grabbing scale-105 shadow-2xl z-50 ring-2 ring-sky-400 transition-none'
           : isDraggable
@@ -347,7 +347,7 @@ export const TableCard: React.FC<TableCardProps> = ({
       <img
         src={getImageUrl()}
         alt={type}
-        className="w-full h-full object-cover pointer-events-none"
+        className="w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
     </div>
