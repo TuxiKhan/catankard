@@ -166,8 +166,9 @@ export const FannedHand: React.FC<FannedHandProps> = ({
   const isSmallScreen = winWidth < 768;
   const isMobileLandscape = winHeight <= 520 && winWidth >= 500;
 
-  // İki sıralı dizilim kontrolü (Elde 6 veya daha fazla kart olduğunda iki sıra basamaklı yerleşim)
-  const isTwoRow = isBottomFan && !isOpponentHand && totalCards >= 6;
+  // İki sıralı dizilim kontrolü: SADECE MOBİLDE (küçük ekranda veya mobil yatayda) çift sıra olsun. PC'de her zaman tek sıra kalsın!
+  const isMobileFan = isSmallScreen || isMobileLandscape;
+  const isTwoRow = isMobileFan && isBottomFan && !isOpponentHand && totalCards >= 6;
   const topCount = isTwoRow ? Math.ceil(totalCards / 2) : totalCards;
   const bottomCount = isTwoRow ? totalCards - topCount : 0;
   const maxInRow = isTwoRow ? topCount : totalCards;

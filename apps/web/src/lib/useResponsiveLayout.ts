@@ -52,7 +52,7 @@ export function useResponsiveLayout(): ResponsiveLayoutMetrics {
   if (isMobilePortrait) {
     marketScale = 0.38;
   } else if (isMobileLandscape) {
-    marketScale = 0.54;
+    marketScale = 0.58;
   } else if (width <= 1024 || height <= 680) {
     marketScale = 0.68;
   }
@@ -64,8 +64,8 @@ export function useResponsiveLayout(): ResponsiveLayoutMetrics {
     opponentCardScale = 0.38;
     opponentHandScale = 0.37;
   } else if (isMobileLandscape) {
-    opponentCardScale = 0.38;
-    opponentHandScale = 0.38;
+    opponentCardScale = 0.42;
+    opponentHandScale = 0.42;
   } else if (width <= 1024 || height <= 680) {
     opponentCardScale = 0.70;
     opponentHandScale = 0.60;
@@ -78,8 +78,8 @@ export function useResponsiveLayout(): ResponsiveLayoutMetrics {
     playerCardScale = 0.43;
     playerHandScale = 0.42;
   } else if (isMobileLandscape) {
-    playerCardScale = 0.55;
-    playerHandScale = 0.58;
+    playerCardScale = 0.60;
+    playerHandScale = 0.62;
   } else if (width <= 1024 || height <= 680) {
     playerCardScale = 0.78;
     playerHandScale = 0.75;

@@ -119,7 +119,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
 
   // Kapalı desteler mobilde daha kompakt olsun, açık kartlar ise büyük ve oynanabilir kalsın
   const isDeckCompact = isMobileLandscape || isMobilePortrait;
-  const deckScale = isDeckCompact ? scale * 0.72 : scale;
+  const deckScale = isDeckCompact ? scale * 0.68 : scale;
   const deckW = Math.round(125 * deckScale);
   const deckH = Math.round(194 * deckScale);
   const bonusDeckW = Math.round(bonusBaseW * deckScale);
