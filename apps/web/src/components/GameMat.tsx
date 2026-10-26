@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { PlayerView } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
-import { Palette, Check } from 'lucide-react';
+import { Palette, Check, Volume2, VolumeX } from 'lucide-react';
+import { useBackgroundMusic } from '../lib/useBackgroundMusic.ts';
 
 export type TableThemeId = 'bordo' | 'emerald' | 'midnight' | 'anthracite';
 
@@ -98,6 +99,7 @@ export const GameMat: React.FC<GameMatProps> = ({
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { isMuted, toggleMute } = useBackgroundMusic();
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -152,8 +154,22 @@ export const GameMat: React.FC<GameMatProps> = ({
         className="absolute inset-0 pointer-events-none shadow-[inset_0_0_160px_rgba(0,0,0,0.85),inset_0_0_60px_rgba(0,0,0,0.5)] z-0"
       />
 
-      {/* Masa Rengi Teması Seçici */}
-      <div className="absolute top-3.5 right-4 z-40" ref={menuRef}>
+      {/* Masa Rengi Teması Seçici & Ses Açma/Kapama Tuşu */}
+      <div className="absolute top-3.5 right-4 z-40 flex items-center gap-1.5" ref={menuRef}>
+        <button
+          type="button"
+          onClick={toggleMute}
+          title={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
+          aria-label={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
+          className={`flex items-center justify-center p-1.5 rounded-full bg-black/60 hover:bg-black/85 border backdrop-blur-md transition shadow-lg cursor-pointer ${
+            isMuted
+              ? 'text-slate-400 border-slate-600/50 hover:text-amber-200'
+              : 'text-amber-300 border-amber-600/40 hover:text-amber-100'
+          }`}
+        >
+          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        </button>
+
         <div className="relative">
           <button
             type="button"

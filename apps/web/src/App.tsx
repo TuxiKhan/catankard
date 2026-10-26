@@ -12,6 +12,7 @@ import { RobberModal } from './components/RobberModal.tsx';
 import { TradeModal } from './components/TradeModal.tsx';
 import { getCardDetails, type CardDetails } from './lib/cardImages.ts';
 import { ensureAnonymousAuth, invokeEdgeFunction, supabase } from './lib/supabase.ts';
+import { useBackgroundMusic } from './lib/useBackgroundMusic.ts';
 import { useFullscreen } from './lib/useFullscreen.ts';
 
 export const App: React.FC = () => {
@@ -255,6 +256,8 @@ export const App: React.FC = () => {
   };
 
   const isGameActive = room?.status === 'playing' && playerView;
+  const isMusicPlaying = Boolean(isGameActive && !playerView?.winner && playerView?.phase !== 'finished');
+  useBackgroundMusic(isMusicPlaying);
 
   return (
     <div className={`relative w-full h-full min-h-screen ${isGameActive ? 'overflow-hidden' : 'overflow-y-auto bg-slate-950'}`}>
