@@ -155,19 +155,25 @@ export const GameMat: React.FC<GameMatProps> = ({
       />
 
       {/* Masa Rengi Teması Seçici & Ses Açma/Kapama Tuşu */}
-      <div className="absolute top-3.5 right-4 z-40 flex items-center gap-1.5" ref={menuRef}>
+      <div
+        className="fixed top-1.5 right-2 sm:top-14 sm:right-4 z-[60] flex items-center gap-1.5 pointer-events-auto"
+        ref={menuRef}
+      >
         <button
           type="button"
-          onClick={toggleMute}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMute();
+          }}
           title={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
           aria-label={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
-          className={`flex items-center justify-center p-1.5 rounded-full bg-black/60 hover:bg-black/85 border backdrop-blur-md transition shadow-lg cursor-pointer ${
+          className={`flex items-center justify-center p-1.5 sm:p-2 rounded-full bg-black/75 hover:bg-black/95 border backdrop-blur-md transition shadow-lg cursor-pointer ${
             isMuted
-              ? 'text-slate-400 border-slate-600/50 hover:text-amber-200'
-              : 'text-amber-300 border-amber-600/40 hover:text-amber-100'
+              ? 'text-red-400 border-red-500/50 hover:text-red-300'
+              : 'text-amber-300 border-amber-500/50 hover:text-amber-100'
           }`}
         >
-          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
         </button>
 
         <div className="relative">
