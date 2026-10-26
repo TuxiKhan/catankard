@@ -188,7 +188,7 @@ export function useRealtimeCardPositions(
 
   const legacyStorageKey = options?.legacyStorageKey;
 
-  // 1. Yerel Depolamadan (localStorage) Başlangıç Pozisyonlarını Yükle
+  // 1. Başlangıç Pozisyonları (Oyun veya tur başında kartların eski/bozuk koordinatlara fırlamaması için her zaman varsayılan düzenli {x:0, y:0} yuvasında başlar)
   const [positionsByPlayer, setPositionsByPlayer] = useState<
     Record<string, Record<string, CardPosition>>
   >(() => {
@@ -210,42 +210,6 @@ export function useRealtimeCardPositions(
       }
     }
 
-    if (typeof window !== 'undefined') {
-      try {
-        // Yeni oda/oyuncu bazlı saklama anahtarını dene
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            for (const [pId, pMap] of Object.entries(parsed)) {
-              if (pMap && typeof pMap === 'object') {
-                initialMap[pId] = initialMap[pId] ?? {};
-                for (const [cId, cPos] of Object.entries(pMap as Record<string, CardPosition>)) {
-                  initialMap[pId][cId] = sanitizeCardPosition(cPos);
-                }
-              }
-            }
-          }
-        }
-
-        // Eski tekil oyuncu anahtarı varsa (örn: catankard_4p_card_positions)
-        if (legacyStorageKey && playerId) {
-          const legacySaved = localStorage.getItem(legacyStorageKey);
-          if (legacySaved) {
-            const legacyParsed = JSON.parse(legacySaved);
-            if (legacyParsed && typeof legacyParsed === 'object') {
-              initialMap[playerId] = initialMap[playerId] ?? {};
-              for (const [cId, cPos] of Object.entries(legacyParsed as Record<string, CardPosition>)) {
-                initialMap[playerId][cId] = sanitizeCardPosition(cPos);
-              }
-            }
-          }
-        }
-      } catch {
-        // Parse hatalarını sessizce yut
-      }
-    }
-
     return initialMap;
   });
 
@@ -254,18 +218,7 @@ export function useRealtimeCardPositions(
     (playerId ? positionsByPlayer[playerId] : undefined) ?? {};
 
   // Kart Z-Index Katman Sıralaması (Son tutulan/hareket ettirilen kart her zaman üstte kalır)
-  const [cardZIndices, setCardZIndices] = useState<Record<string, number>>(() => {
-    if (typeof window !== 'undefined' && storageKey) {
-      try {
-        const saved = localStorage.getItem(`${storageKey}_z`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') return parsed;
-        }
-      } catch {}
-    }
-    return {};
-  });
+  const [cardZIndices, setCardZIndices] = useState<Record<string, number>>({});
 
   const topZRef = useRef<number>(10);
 
@@ -278,35 +231,14 @@ export function useRealtimeCardPositions(
         10
       ) + 1;
       const nextZ = topZRef.current;
-      setCardZIndices((prev) => {
-        const updated = { ...prev, [cardId]: nextZ };
-        if (typeof window !== 'undefined' && storageKey) {
-          try {
-            localStorage.setItem(`${storageKey}_z`, JSON.stringify(updated));
-          } catch {}
-        }
-        return updated;
-      });
+      setCardZIndices((prev) => ({
+        ...prev,
+        [cardId]: nextZ,
+      }));
       return nextZ;
     },
-    [cardZIndices, storageKey]
+    [cardZIndices]
   );
-
-  // LocalStorage senkronizasyonu
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(positionsByPlayer));
-      if (legacyStorageKey && playerId && positionsByPlayer[playerId]) {
-        localStorage.setItem(
-          legacyStorageKey,
-          JSON.stringify(positionsByPlayer[playerId])
-        );
-      }
-    } catch {
-      // ignore storage quota errors
-    }
-  }, [positionsByPlayer, storageKey, legacyStorageKey, playerId]);
 
   // Realtime Kanalı ve Canlı Broadcast Dinleme
   const channelRef = useRef<any>(null);

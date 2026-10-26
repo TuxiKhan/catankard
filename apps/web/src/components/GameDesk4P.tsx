@@ -210,7 +210,16 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
 
     try {
       setLoading(true);
+      const prevRoads = Math.max(1, view.players[view.you]?.area?.roads ?? 1);
+      const prevKnights = view.players[view.you]?.area?.knights ?? 0;
       await onBuild(card.id, source, undefined, substitution);
+      if (cardType === 'road') {
+        bringToFront(`${view.you}-road-${prevRoads}`);
+      } else if (cardType === 'knight') {
+        bringToFront(`${view.you}-knight-${prevKnights}`);
+      } else if (cardType === 'settlement') {
+        bringToFront(card.id);
+      }
       spawnImpact({
         x: window.innerWidth * 0.65,
         y: window.innerHeight * 0.75,
@@ -272,6 +281,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
         stackId,
         pendingUpgrade.substitution
       );
+      bringToFront(stackId);
       spawnImpact({
         x: window.innerWidth * 0.65,
         y: window.innerHeight * 0.75,
@@ -1053,7 +1063,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                 tableCardsDealt ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <div className={`flex ${isMobile ? 'flex-nowrap gap-0.5 mr-0.5' : 'flex-wrap gap-1 sm:gap-2.5 max-w-[140px] sm:max-w-xl lg:max-w-4xl'} items-end justify-end`}>
+              <div className={`flex ${isMobile ? 'flex-nowrap gap-0.5 mr-0.5' : 'flex-nowrap gap-1.5 sm:gap-2'} items-end justify-end`}>
                 {/* Yerleşim Yığınları: 4P Mobilde tüm binalar tek bir çekmece sütununda dikey istiflenir (sola doğru uzamaz!) */}
                 {isMobile ? (
                   primaryYouStack && (
@@ -1095,6 +1105,9 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                       cardWidth: Math.round(125 * playerCardScale),
                     });
 
+                    const stackZ = cardZIndices[stack.id];
+                    const pos = cardPositions[stack.id];
+
                     return (
                       <CardStack
                         key={stack.id}
@@ -1107,11 +1120,11 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         baseWidth={125}
                         baseHeight={194}
                         isDraggable={!isMobile}
-                        position={cardPositions[stack.id]}
-                        zIndex={cardZIndices[stack.id]}
+                        position={pos}
+                        zIndex={stackZ ?? index + 1}
                         onBringToFront={() => bringToFront(stack.id)}
-                        onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
-                        onDragMove={(pos) => broadcastCardPosition(stack.id, pos)}
+                        onPositionChange={(p) => updateCardPosition(stack.id, p)}
+                        onDragMove={(p) => broadcastCardPosition(stack.id, p)}
                         onDragChange={setIsCardDragging}
                         clampPosition={clampFn}
                       />
@@ -1159,7 +1172,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         baseHeight={194}
                         isDraggable={true}
                         position={cardPositions[cardId] || cardPositions[`you-4p-road-${i}`]}
-                        zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-road-${i}`]}
+                        zIndex={cardZIndices[cardId] ?? cardZIndices[`you-4p-road-${i}`] ?? slotIdx + 1}
                         onBringToFront={() => bringToFront(cardId)}
                         onPositionChange={(pos) => updateCardPosition(cardId, pos)}
                         onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
@@ -1210,7 +1223,7 @@ export const GameDesk4P: React.FC<GameDesk4PProps> = ({
                         baseHeight={194}
                         isDraggable={true}
                         position={cardPositions[cardId] || cardPositions[`you-4p-knight-${i}`]}
-                        zIndex={cardZIndices[cardId] || cardZIndices[`you-4p-knight-${i}`]}
+                        zIndex={cardZIndices[cardId] ?? cardZIndices[`you-4p-knight-${i}`] ?? slotIdx + 1}
                         onBringToFront={() => bringToFront(cardId)}
                         onPositionChange={(pos) => updateCardPosition(cardId, pos)}
                         onDragMove={(pos) => broadcastCardPosition(cardId, pos)}

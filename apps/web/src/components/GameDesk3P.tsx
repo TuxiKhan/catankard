@@ -209,7 +209,16 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
 
     try {
       setLoading(true);
+      const prevRoads = Math.max(1, view.players[view.you]?.area?.roads ?? 1);
+      const prevKnights = view.players[view.you]?.area?.knights ?? 0;
       await onBuild(card.id, source, undefined, substitution);
+      if (cardType === 'road') {
+        bringToFront(`${view.you}-road-${prevRoads}`);
+      } else if (cardType === 'knight') {
+        bringToFront(`${view.you}-knight-${prevKnights}`);
+      } else if (cardType === 'settlement') {
+        bringToFront(card.id);
+      }
       spawnImpact({
         x: window.innerWidth * 0.5,
         y: window.innerHeight * 0.72,
@@ -271,6 +280,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
         stackId,
         pendingUpgrade.substitution
       );
+      bringToFront(stackId);
       spawnImpact({
         x: window.innerWidth * 0.5,
         y: window.innerHeight * 0.72,
@@ -845,7 +855,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               tableCardsDealt ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <div className={`flex ${isMobile ? 'flex-nowrap gap-1.5 mr-1' : 'flex-wrap gap-1 sm:gap-2.5 max-w-[140px] sm:max-w-xl lg:max-w-4xl'} items-end justify-end`}>
+            <div className={`flex ${isMobile ? 'flex-nowrap gap-1.5 mr-1' : 'flex-nowrap gap-1.5 sm:gap-2.5'} items-end justify-end`}>
               {isMobile
                 ? groupSettlementStacks(youArea?.stacks).map((group) => {
                     const stack = group.primaryStack;
@@ -903,7 +913,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                         baseHeight={194}
                         isDraggable={!isMobile}
                         position={cardPositions[stack.id]}
-                        zIndex={cardZIndices[stack.id]}
+                        zIndex={cardZIndices[stack.id] ?? index + 1}
                         onBringToFront={() => bringToFront(stack.id)}
                         onPositionChange={(pos) => updateCardPosition(stack.id, pos)}
                         onDragMove={(pos) => broadcastCardPosition(stack.id, pos)}
@@ -951,7 +961,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       baseHeight={194}
                       isDraggable={true}
                       position={cardPositions[cardId] || cardPositions[`you-road-${i}`]}
-                      zIndex={cardZIndices[cardId] || cardZIndices[`you-road-${i}`]}
+                      zIndex={cardZIndices[cardId] ?? cardZIndices[`you-road-${i}`] ?? slotIdx + 1}
                       onBringToFront={() => bringToFront(cardId)}
                       onPositionChange={(pos) => updateCardPosition(cardId, pos)}
                       onDragMove={(pos) => broadcastCardPosition(cardId, pos)}
@@ -1000,7 +1010,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                       baseHeight={194}
                       isDraggable={true}
                       position={cardPositions[cardId] || cardPositions[`you-knight-${i}`]}
-                      zIndex={cardZIndices[cardId] || cardZIndices[`you-knight-${i}`]}
+                      zIndex={cardZIndices[cardId] ?? cardZIndices[`you-knight-${i}`] ?? slotIdx + 1}
                       onBringToFront={() => bringToFront(cardId)}
                       onPositionChange={(pos) => updateCardPosition(cardId, pos)}
                       onDragMove={(pos) => broadcastCardPosition(cardId, pos)}

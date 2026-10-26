@@ -368,7 +368,7 @@ export const TableCard: React.FC<TableCardProps> = ({
         transform: transformStyle,
         transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)',
         zIndex: isDragging
-          ? 100
+          ? 99999
           : isExpandedInPlace
           ? 45
           : zIndex ?? (hasCustomPos ? 5 : 1),
