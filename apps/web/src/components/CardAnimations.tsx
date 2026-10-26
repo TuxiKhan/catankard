@@ -90,18 +90,56 @@ export const CARD_ANIMATION_STYLES = `
   }
 }
 
-@keyframes replenishSlideIn {
+@keyframes replenishCardReveal {
   0% {
     opacity: 0;
-    transform: translate3d(-100px, 0, 30px) rotateY(0deg) scale(0.85);
+    transform: translate3d(-48px, -10px, 0) scale(0.86);
   }
-  45% {
+  55% {
     opacity: 1;
-    transform: translate3d(0, 0, 20px) rotateY(90deg) scale(1.05);
+    transform: translate3d(4px, 0, 0) scale(1.04);
   }
   100% {
     opacity: 1;
-    transform: translate3d(0, 0, 0) rotateY(180deg) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes replenishBackFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 1;
+    transform: scaleX(0.08) scaleY(1.04);
+  }
+  50% {
+    opacity: 0;
+    transform: scaleX(0) scaleY(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(0) scaleY(1);
+  }
+}
+
+@keyframes replenishFrontFlipIn {
+  0% {
+    opacity: 0;
+    transform: scaleX(0) scaleY(1.04);
+  }
+  45% {
+    opacity: 0;
+    transform: scaleX(0.08) scaleY(1.04);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(0.12) scaleY(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
   }
 }
 
@@ -663,23 +701,22 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
 
   return (
     <div
-      className="perspective-1000 select-none relative"
+      className="select-none relative"
       style={{ width: `${width}px`, height: `${height}px` }}
     >
       <CardAnimationStylesInjector />
 
       <div
-        className={`w-full h-full relative preserve-3d transition-transform duration-300 ${
+        key={card.id}
+        className={`w-full h-full relative transition-transform duration-200 ${
           isReplenishing ? '' : canAfford ? 'hover:scale-105 cursor-pointer' : 'hover:scale-[1.02]'
         }`}
         style={
           isReplenishing
             ? {
-                animation: 'replenishSlideIn 0.85s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
+                animation: 'replenishCardReveal 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
               }
-            : {
-                transform: 'rotateY(180deg)',
-              }
+            : undefined
         }
         onClick={(e) => {
           if (longPressFiredRef.current) {
@@ -695,25 +732,20 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
         onContextMenu={onContextMenu}
         onDoubleClick={onDoubleClick}
       >
+        {/* Ön Yüz (Her zaman 0deg düzlemde net ve hatasız görünür) */}
         <div
-          className="absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 backface-hidden"
-          style={{ transform: 'rotateY(0deg)' }}
-        >
-          <img
-            src={assetUrl('/assets/cards/building/building_back.png')}
-            alt="Kapalı Kart"
-            className="w-full h-full object-contain"
-            draggable={false}
-          />
-        </div>
-
-        <div
-          className={`absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 backface-hidden ${
+          className={`absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 ${
             canAfford
               ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)]'
               : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50'
           }`}
-          style={{ transform: 'rotateY(180deg)' }}
+          style={
+            isReplenishing
+              ? {
+                  animation: 'replenishFrontFlipIn 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
+                }
+              : undefined
+          }
         >
           <img
             src={getBuildingImageUrl(card.type)}
@@ -730,12 +762,29 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
               <div
                 className="w-16 h-full bg-linear-to-r from-transparent via-white/70 to-transparent blur-xs"
                 style={{
-                  animation: 'cardSheenGlide 0.65s 0.4s ease-out forwards',
+                  animation: 'cardSheenGlide 0.65s 0.35s ease-out forwards',
                 }}
               />
             </div>
           )}
         </div>
+
+        {/* Arka Yüz (Sadece yeni kart açılırken ilk yarıda gözüküp kaybolur, sonrasında DOM'da bile kalmaz!) */}
+        {isReplenishing && (
+          <div
+            className="absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 pointer-events-none"
+            style={{
+              animation: 'replenishBackFadeOut 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
+            }}
+          >
+            <img
+              src={assetUrl('/assets/cards/building/building_back.png')}
+              alt="Kapalı Kart"
+              className="w-full h-full object-contain"
+              draggable={false}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

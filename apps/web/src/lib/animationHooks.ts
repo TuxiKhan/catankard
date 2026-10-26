@@ -282,6 +282,9 @@ export function useCardAnimations() {
 export function useReplenishDetector(buildingRow: BuildingCard[]) {
   const prevRowRef = useRef<Array<string | null>>([null, null, null, null, null]);
   const [replenishingIndices, setReplenishingIndices] = useState<Set<number>>(new Set());
+  const clearTimerRef = useRef<number | null>(null);
+
+  const rowSignature = buildingRow.map((c) => c?.id ?? '').join('|');
 
   useEffect(() => {
     const currentIds = [0, 1, 2, 3, 4].map((i) => buildingRow[i]?.id ?? null);
@@ -302,16 +305,30 @@ export function useReplenishDetector(buildingRow: BuildingCard[]) {
     prevRowRef.current = currentIds;
 
     if (newlyFilled.size > 0) {
-      setReplenishingIndices(newlyFilled);
+      setReplenishingIndices((prev) => {
+        const merged = new Set(prev);
+        newlyFilled.forEach((idx) => merged.add(idx));
+        return merged;
+      });
       cardAudio.playCardFlip();
 
-      const timer = setTimeout(() => {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+      clearTimerRef.current = window.setTimeout(() => {
         setReplenishingIndices(new Set());
-      }, 950);
-
-      return () => clearTimeout(timer);
+        clearTimerRef.current = null;
+      }, 900);
     }
-  }, [buildingRow]);
+  }, [rowSignature]);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+    };
+  }, []);
 
   const isReplenishing = useCallback(
     (index: number) => replenishingIndices.has(index),
