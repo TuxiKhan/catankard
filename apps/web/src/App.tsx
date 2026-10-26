@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   type Action,
   type PlayerView,
+  type Resource,
+  type ResourceCounts,
 } from '@catankard/engine';
 import { CardModal } from './components/CardModal.tsx';
 import { CharityModal } from './components/CharityModal.tsx';
@@ -62,10 +64,20 @@ export const App: React.FC = () => {
   };
 
   // 2. Realtime Abonelikleri (Lobi & Oyun Durumu)
+  const roomChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const syncPlayerView = (targetRoomId: string) => {
+    invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId: targetRoomId })
+      .then((res) => {
+        if (res.view) setPlayerView(res.view);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     if (!roomId) return;
 
-    // Oda tablosunu dinle
+    // Oda tablosunu ve senkronizasyon broadcast'ini dinle
     const roomChannel = supabase
       .channel(`room:${roomId}`)
       .on(
@@ -76,11 +88,7 @@ export const App: React.FC = () => {
             const nextRoom: any = payload.new;
             setRoom(nextRoom);
             if (nextRoom.status === 'playing') {
-              invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
-                .then((res) => {
-                  if (res.view) setPlayerView(res.view);
-                })
-                .catch(() => {});
+              syncPlayerView(roomId);
             }
           }
         }
@@ -92,7 +100,12 @@ export const App: React.FC = () => {
           fetchRoomPlayers(roomId);
         }
       )
+      .on('broadcast', { event: 'state_updated' }, () => {
+        syncPlayerView(roomId);
+      })
       .subscribe();
+
+    roomChannelRef.current = roomChannel;
 
     // Kendi player_view satırını dinle
     const viewChannel = supabase
@@ -132,29 +145,26 @@ export const App: React.FC = () => {
 
     fetchRoom(roomId);
     fetchRoomPlayers(roomId);
-    invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
-      .then((res) => {
-        if (res.view) setPlayerView(res.view);
-      })
-      .catch(() => {});
+    syncPlayerView(roomId);
 
     return () => {
+      roomChannelRef.current = null;
       supabase.removeChannel(roomChannel);
       supabase.removeChannel(viewChannel);
     };
   }, [roomId, userId]);
 
-  // 3. Heartbeat (Her 15 saniyede bir son görülme zamanını güncelle ve görünümü senkronize et)
+  // 3. Heartbeat & Yedek Senkronizasyon (Her 3 saniyede bir son görülme zamanını ve oyun görünümünü senkronize et)
   useEffect(() => {
     if (!roomId || !userId) return;
 
     const interval = setInterval(() => {
       invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
         .then((res) => {
-          if (res.view) setPlayerView((prev) => prev ?? res.view!);
+          if (res.view) setPlayerView(res.view);
         })
         .catch(() => {});
-    }, 15000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [roomId, userId]);
@@ -245,6 +255,11 @@ export const App: React.FC = () => {
       if (data.view) {
         setPlayerView(data.view);
       }
+      roomChannelRef.current?.send({
+        type: 'broadcast',
+        event: 'state_updated',
+        payload: { by: userId, at: Date.now() },
+      });
     } catch (err: any) {
       alert(err.message || 'Hamle gerçekleştirilemedi.');
     }
@@ -259,6 +274,31 @@ export const App: React.FC = () => {
   const isMusicPlaying = Boolean(isGameActive && !playerView?.winner && playerView?.phase !== 'finished');
   useBackgroundMusic(isMusicPlaying);
 
+  const RES_LABELS: Record<Resource, string> = {
+    brick: 'Tuğla',
+    wood: 'Odun',
+    wool: 'Yün',
+    wheat: 'Buğday',
+    ore: 'Demir',
+  };
+
+  const formatTradeResources = (counts: ResourceCounts) =>
+    (['brick', 'wood', 'wool', 'wheat', 'ore'] as Resource[])
+      .filter((r) => (counts[r] || 0) > 0)
+      .map((r) => `${counts[r]}× ${RES_LABELS[r]}`)
+      .join(', ');
+
+  const incomingOffers =
+    isGameActive && playerView
+      ? playerView.tradeOffers.filter(
+          (o) =>
+            o.status === 'open' &&
+            o.fromPlayerId !== playerView.you &&
+            (!o.toPlayerId || o.toPlayerId === playerView.you) &&
+            (playerView.activePlayerId === playerView.you || o.fromPlayerId === playerView.activePlayerId)
+        )
+      : [];
+
   return (
     <div className={`relative w-full h-full min-h-screen ${isGameActive ? 'overflow-hidden' : 'overflow-y-auto bg-slate-950'}`}>
       {/* Olay Bildirimi Banner'ı */}
@@ -271,6 +311,53 @@ export const App: React.FC = () => {
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Gelen Takas Teklifi Bildirimi */}
+      {incomingOffers.length > 0 && !isTradeModalOpen && playerView && (
+        <div className="fixed top-12 lg:top-16 left-1/2 transform -translate-x-1/2 z-40 flex flex-col gap-1.5 w-[92%] max-w-lg pointer-events-auto">
+          {incomingOffers.map((offer) => {
+            const proposerName = playerView.players[offer.fromPlayerId]?.name || 'Oyuncu';
+            const canAfford = (['brick', 'wood', 'wool', 'wheat', 'ore'] as Resource[]).every(
+              (r) => (playerView.yourHand[r] || 0) >= (offer.want[r] || 0)
+            );
+            return (
+              <div
+                key={offer.id}
+                className="bg-slate-950/95 border-2 border-amber-400/80 text-white px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl shadow-[0_12px_35px_rgba(0,0,0,0.85)] flex items-center justify-between gap-2 sm:gap-3 animate-in slide-in-from-top duration-200 backdrop-blur-md"
+              >
+                <div className="flex flex-col text-[11px] sm:text-xs leading-tight">
+                  <span className="font-black text-amber-400">
+                    🤝 {proposerName} Takas Teklif Ediyor:
+                  </span>
+                  <span className="text-slate-200 mt-0.5">
+                    <strong className="text-emerald-400">Verir:</strong> {formatTradeResources(offer.give)}{' '}
+                    <span className="text-slate-400">➔</span>{' '}
+                    <strong className="text-amber-300">İster:</strong> {formatTradeResources(offer.want)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {canAfford && (
+                    <button
+                      type="button"
+                      onClick={() => dispatchAction({ type: 'accept_trade', offerId: offer.id })}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs rounded-xl shadow transition"
+                    >
+                      Kabul Et
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsTradeModalOpen(true)}
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] sm:text-xs rounded-xl shadow transition"
+                  >
+                    Takası Aç
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

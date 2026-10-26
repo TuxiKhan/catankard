@@ -191,14 +191,14 @@ export function handleAction(
       }
 
       // Teklif ya aktif oyuncu tarafından herkese/birine yapılır ya da pasif oyuncu tarafından aktif oyuncuya yapılır
-      if (actor !== activePid && action.toPlayerId !== activePid) {
+      if (actor !== activePid && (action.toPlayerId ?? activePid) !== activePid) {
         throw new EngineIllegalMoveError('INVALID_TARGET', 'Pasif oyuncular yalnızca aktif oyuncuya teklif verebilir.');
       }
 
       const offer: TradeOffer = {
         id: `offer-${actor}-${now}-${state.tradeOffers.length}`,
         fromPlayerId: actor,
-        toPlayerId: action.toPlayerId,
+        toPlayerId: actor !== activePid ? (action.toPlayerId ?? activePid) : action.toPlayerId,
         give: { ...action.give },
         want: { ...action.want },
         status: 'open',

@@ -147,7 +147,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [toPlayerId, setToPlayerId] = useState<string | null>(null);
+  const [toPlayerId, setToPlayerId] = useState<string | null>(
+    view.activePlayerId !== view.you ? view.activePlayerId : null
+  );
   const [give, setGive] = useState<ResourceCounts>({ brick: 0, wood: 0, wool: 0, wheat: 0, ore: 0 });
   const [want, setWant] = useState<ResourceCounts>({ brick: 0, wood: 0, wool: 0, wheat: 0, ore: 0 });
   const [loading, setLoading] = useState(false);
@@ -178,7 +180,8 @@ export const TradeModal: React.FC<TradeModalProps> = ({
 
     try {
       setLoading(true);
-      await onProposeTrade(toPlayerId, give, want);
+      const targetId = isActive ? toPlayerId : view.activePlayerId;
+      await onProposeTrade(targetId, give, want);
       setGive({ brick: 0, wood: 0, wool: 0, wheat: 0, ore: 0 });
       setWant({ brick: 0, wood: 0, wool: 0, wheat: 0, ore: 0 });
     } catch (err: any) {
@@ -231,7 +234,10 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               {openOffers.map((offer) => {
                 const isMine = offer.fromPlayerId === view.you;
                 const proposerName = view.players[offer.fromPlayerId]?.name || 'Oyuncu';
-                const canAccept = !isMine && (isActive || offer.fromPlayerId === view.activePlayerId);
+                const targetName = offer.toPlayerId ? view.players[offer.toPlayerId]?.name || 'Oyuncu' : 'Herkese';
+                const isTargetedToOther = Boolean(offer.toPlayerId && offer.toPlayerId !== view.you);
+                const canAccept = !isMine && !isTargetedToOther && (isActive || offer.fromPlayerId === view.activePlayerId);
+                const hasEnoughResources = RESOURCES.every((r) => (view.yourHand[r] || 0) >= (offer.want[r] || 0));
 
                 return (
                   <div
@@ -240,7 +246,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                   >
                     <div className="flex-1">
                       <div className="text-xs text-amber-300 font-bold mb-1">
-                        {isMine ? 'Senin Teklifin' : `${proposerName} Teklifi`}:
+                        {isMine ? `Senin Teklifin (Kime: ${targetName})` : `${proposerName} Teklifi (Kime: ${offer.toPlayerId === view.you ? 'Sana' : targetName})`}:
                       </div>
                       <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 flex-wrap">
                         <span className="text-emerald-400 font-bold">Verir:</span>
@@ -262,10 +268,11 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     ) : canAccept ? (
                       <button
                         onClick={() => onAcceptTrade(offer.id)}
-                        disabled={loading}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black transition shadow shadow-emerald-950/60"
+                        disabled={loading || !hasEnoughResources}
+                        title={!hasEnoughResources ? 'Elinizde istenen kaynaklar yok' : 'Teklifi Kabul Et'}
+                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400 text-white rounded-lg text-xs font-black transition shadow shadow-emerald-950/60"
                       >
-                        Kabul Et
+                        {hasEnoughResources ? 'Kabul Et' : 'Kaynak Yetersiz'}
                       </button>
                     ) : null}
                   </div>
@@ -344,16 +351,25 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs font-bold text-slate-300">Kime:</span>
                 <select
-                  value={toPlayerId ?? ''}
+                  value={isActive ? (toPlayerId ?? '') : view.activePlayerId}
                   onChange={(e) => setToPlayerId(e.target.value ? e.target.value : null)}
-                  className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 transition"
+                  disabled={!isActive}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 transition disabled:opacity-80"
                 >
-                  <option value="">Herkese Açık Teklif</option>
-                  {otherPlayers.map(([id, p]) => (
-                    <option key={id} value={id}>
-                      {p.name}
+                  {isActive ? (
+                    <>
+                      <option value="">Herkese Açık Teklif</option>
+                      {otherPlayers.map(([id, p]) => (
+                        <option key={id} value={id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value={view.activePlayerId}>
+                      {view.players[view.activePlayerId]?.name || 'Aktif Oyuncu'} (Sıradaki Oyuncu)
                     </option>
-                  ))}
+                  )}
                 </select>
               </div>
 
