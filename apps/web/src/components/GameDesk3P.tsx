@@ -431,18 +431,11 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 }`}
               >
                 <span className="truncate max-w-[42px] sm:max-w-[70px]">
-                  {isMe ? 'Sen' : p.name}
+                  {p.name.replace(/^Sen\s*\((.+)\)$/i, '$1').replace(/\s*\(Sen\)$/i, '')}
                 </span>
                 <span className="font-black text-yellow-400 bg-black/40 px-1 py-0.2 rounded-sm sm:rounded-md">
                   {p.visibleVP} ZP
                 </span>
-                {typeof cardCount === 'number' && (
-                  <span className="text-[9px] text-slate-400 font-mono hidden xs:inline" title={`${cardCount} kart`}>
-                    🎴{cardCount}
-                  </span>
-                )}
-                {hasRoute && <span title="En Uzun Yol (+2 ZP)">🛣️</span>}
-                {hasArmy && <span title="En Güçlü Ordu (+2 ZP)">⚔️</span>}
               </div>
             );
           })}
@@ -492,7 +485,9 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           <span className="text-slate-400 font-medium">Tur #{view.turnNumber}</span>
           <span className="text-slate-600">•</span>
           <span className={`font-bold truncate max-w-[85px] ${isActive ? 'text-sky-300' : 'text-amber-300'}`}>
-            {isActive ? 'Sende' : (view.players[view.activePlayerId]?.name || 'Bekleniyor')}
+            {(view.players[view.activePlayerId]?.name || 'Bekleniyor')
+              .replace(/^Sen\s*\((.+)\)$/i, '$1')
+              .replace(/\s*\(Sen\)$/i, '')}
           </span>
           {remainingSeconds !== null && (
             <>
@@ -1212,7 +1207,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
               />
             </div>
             <PlayerNameplate
-              name={youPlayer?.name || 'Sen'}
+              name={youPlayer?.name || 'Oyuncu'}
               isTurn={isActive}
               isMe={true}
               victoryPoints={youPlayer?.visibleVP ?? 0}

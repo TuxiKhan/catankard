@@ -26,6 +26,8 @@ export const PlayerNameplate: React.FC<PlayerNameplateProps> = ({
     name
       .replace(/^Sen\s*\((.+)\)$/i, '$1')
       .replace(/\s*\(Sen\)$/i, '')
+      .replace(/^Sen$/i, 'Oyuncu')
+      .replace(/\s+SENDE$/i, '')
       .trim() || name;
 
   const alignContainerClass =
