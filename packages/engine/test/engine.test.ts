@@ -107,7 +107,7 @@ describe('Game Engine - Trading Mechanics', () => {
     expect(state.hands[partnerPid]!.wood).toBe(0);
     expect(state.hands[partnerPid]!.brick).toBeGreaterThanOrEqual(1);
     const partnerTotal = Object.values(state.hands[partnerPid]!).reduce((a, b) => a + b, 0);
-    expect(partnerTotal).toBe(2);
+    expect( partnerTotal ).toBe(1);
 
     expect(state.turnFlags.traded).toBe(true);
   });
