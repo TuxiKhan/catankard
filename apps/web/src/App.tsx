@@ -71,7 +71,7 @@ export const App: React.FC = () => {
   const startDemoGame = (count: 3 | 4 = 4) => {
     const pids = count === 4 ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2', 'p3'];
     const names: Record<string, string> = {
-      p1: playerName || 'Sen (Sina)',
+      p1: playerName || 'Sina',
       p2: 'Ahmet',
       p3: 'Zeynep',
       p4: 'Can',
