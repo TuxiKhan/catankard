@@ -320,6 +320,66 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
     (youHasRoute ? 1 : 0) +
     (youHasArmy ? 1 : 0);
 
+  const mobilePlayerBonusScale = isMobilePortrait ? 0.44 : 0.52;
+  const mobileOpponentBonusScale = Math.min(0.42, opponentCardScale * 1.15);
+
+  const renderStackedBonusCards = (
+    ownerPrefix: string,
+    hasRoute: boolean,
+    hasArmy: boolean,
+    scale: number,
+    extraClassName = ''
+  ) => {
+    if (!hasRoute && !hasArmy) return null;
+    const bonusBaseW = 186;
+    const bonusBaseH = 120;
+    const bonusShiftY = 26;
+    const hasBoth = hasRoute && hasArmy;
+    const containerW = Math.round(bonusBaseW * scale);
+    const containerH = Math.round((hasBoth ? bonusBaseH + bonusShiftY : bonusBaseH) * scale);
+
+    return (
+      <div
+        className={`relative shrink-0 select-none ${extraClassName}`}
+        style={{ width: `${containerW}px`, height: `${containerH}px` }}
+      >
+        {hasRoute && (
+          <div className="absolute left-0 top-0 z-10">
+            <TableCard
+              key={`${ownerPrefix}-bonus-longest-route`}
+              id={`${ownerPrefix}-bonus-longest-route`}
+              type="longest_route"
+              scale={scale}
+              baseWidth={bonusBaseW}
+              baseHeight={bonusBaseH}
+              folderMode={false}
+              isDraggable={false}
+              onInspect={() => onInspectCard('longest_route')}
+            />
+          </div>
+        )}
+        {hasArmy && (
+          <div
+            className="absolute left-0 z-20"
+            style={{ top: hasBoth ? `${Math.round(bonusShiftY * scale)}px` : '0px' }}
+          >
+            <TableCard
+              key={`${ownerPrefix}-bonus-largest-army`}
+              id={`${ownerPrefix}-bonus-largest-army`}
+              type="largest_army"
+              scale={scale}
+              baseWidth={bonusBaseW}
+              baseHeight={bonusBaseH}
+              folderMode={false}
+              isDraggable={false}
+              onInspect={() => onInspectCard('largest_army')}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full h-screen min-h-screen flex flex-col justify-between overflow-hidden">
       <TimeWarningOverlay
@@ -643,34 +703,47 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     })
                   )}
 
-                  {oppLeftHasRoute && (
-                    <TableCard
-                      key={`${oppLeft}-bonus-longest-route`}
-                      id={`${oppLeft}-bonus-longest-route`}
-                      type="longest_route"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={false}
-                      position={positionsByPlayer[oppLeft]?.[`${oppLeft}-bonus-longest-route`]}
-                      zIndex={cardZIndices[`${oppLeft}-bonus-longest-route`]}
-                      onInspect={() => onInspectCard('longest_route')}
-                    />
-                  )}
-                  {oppLeftHasArmy && (
-                    <TableCard
-                      key={`${oppLeft}-bonus-largest-army`}
-                      id={`${oppLeft}-bonus-largest-army`}
-                      type="largest_army"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={false}
-                      position={positionsByPlayer[oppLeft]?.[`${oppLeft}-bonus-largest-army`]}
-                      zIndex={cardZIndices[`${oppLeft}-bonus-largest-army`]}
-                      onInspect={() => onInspectCard('largest_army')}
-                    />
-                  )}
+                  {(oppLeftHasRoute || oppLeftHasArmy) &&
+                    (isMobile ? (
+                      renderStackedBonusCards(
+                        oppLeft,
+                        oppLeftHasRoute,
+                        oppLeftHasArmy,
+                        mobileOpponentBonusScale,
+                        'ml-1.5'
+                      )
+                    ) : (
+                      <div className="flex gap-1 items-end">
+                        {oppLeftHasRoute && (
+                          <TableCard
+                            key={`${oppLeft}-bonus-longest-route`}
+                            id={`${oppLeft}-bonus-longest-route`}
+                            type="longest_route"
+                            scale={opponentCardScale}
+                            baseWidth={186}
+                            baseHeight={120}
+                            folderMode={false}
+                            position={positionsByPlayer[oppLeft]?.[`${oppLeft}-bonus-longest-route`]}
+                            zIndex={cardZIndices[`${oppLeft}-bonus-longest-route`]}
+                            onInspect={() => onInspectCard('longest_route')}
+                          />
+                        )}
+                        {oppLeftHasArmy && (
+                          <TableCard
+                            key={`${oppLeft}-bonus-largest-army`}
+                            id={`${oppLeft}-bonus-largest-army`}
+                            type="largest_army"
+                            scale={opponentCardScale}
+                            baseWidth={186}
+                            baseHeight={120}
+                            folderMode={false}
+                            position={positionsByPlayer[oppLeft]?.[`${oppLeft}-bonus-largest-army`]}
+                            zIndex={cardZIndices[`${oppLeft}-bonus-largest-army`]}
+                            onInspect={() => onInspectCard('largest_army')}
+                          />
+                        )}
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
@@ -803,34 +876,47 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                     })
                   )}
 
-                  {oppRightHasRoute && (
-                    <TableCard
-                      key={`${oppRight}-bonus-longest-route`}
-                      id={`${oppRight}-bonus-longest-route`}
-                      type="longest_route"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={false}
-                      position={positionsByPlayer[oppRight]?.[`${oppRight}-bonus-longest-route`]}
-                      zIndex={cardZIndices[`${oppRight}-bonus-longest-route`]}
-                      onInspect={() => onInspectCard('longest_route')}
-                    />
-                  )}
-                  {oppRightHasArmy && (
-                    <TableCard
-                      key={`${oppRight}-bonus-largest-army`}
-                      id={`${oppRight}-bonus-largest-army`}
-                      type="largest_army"
-                      scale={opponentCardScale}
-                      baseWidth={186}
-                      baseHeight={120}
-                      folderMode={false}
-                      position={positionsByPlayer[oppRight]?.[`${oppRight}-bonus-largest-army`]}
-                      zIndex={cardZIndices[`${oppRight}-bonus-largest-army`]}
-                      onInspect={() => onInspectCard('largest_army')}
-                    />
-                  )}
+                  {(oppRightHasRoute || oppRightHasArmy) &&
+                    (isMobile ? (
+                      renderStackedBonusCards(
+                        oppRight,
+                        oppRightHasRoute,
+                        oppRightHasArmy,
+                        mobileOpponentBonusScale,
+                        'ml-1.5'
+                      )
+                    ) : (
+                      <div className="flex gap-1 items-end">
+                        {oppRightHasRoute && (
+                          <TableCard
+                            key={`${oppRight}-bonus-longest-route`}
+                            id={`${oppRight}-bonus-longest-route`}
+                            type="longest_route"
+                            scale={opponentCardScale}
+                            baseWidth={186}
+                            baseHeight={120}
+                            folderMode={false}
+                            position={positionsByPlayer[oppRight]?.[`${oppRight}-bonus-longest-route`]}
+                            zIndex={cardZIndices[`${oppRight}-bonus-longest-route`]}
+                            onInspect={() => onInspectCard('longest_route')}
+                          />
+                        )}
+                        {oppRightHasArmy && (
+                          <TableCard
+                            key={`${oppRight}-bonus-largest-army`}
+                            id={`${oppRight}-bonus-largest-army`}
+                            type="largest_army"
+                            scale={opponentCardScale}
+                            baseWidth={186}
+                            baseHeight={120}
+                            folderMode={false}
+                            position={positionsByPlayer[oppRight]?.[`${oppRight}-bonus-largest-army`]}
+                            zIndex={cardZIndices[`${oppRight}-bonus-largest-army`]}
+                            onInspect={() => onInspectCard('largest_army')}
+                          />
+                        )}
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>
@@ -1022,7 +1108,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                 })
               )}
 
-              {youHasRoute && (
+              {!isMobile && youHasRoute && (
                 <TableCard
                   key="bonus-longest-route"
                   id={`${view.you}-bonus-longest-route`}
@@ -1031,7 +1117,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   baseWidth={186}
                   baseHeight={120}
                   folderMode={false}
-                  isDraggable={!isMobile}
+                  isDraggable={true}
                   position={
                     cardPositions[`${view.you}-bonus-longest-route`] ||
                     cardPositions['bonus-longest-route']
@@ -1058,7 +1144,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   onInspect={() => onInspectCard('longest_route')}
                 />
               )}
-              {youHasArmy && (
+              {!isMobile && youHasArmy && (
                 <TableCard
                   key="bonus-largest-army"
                   id={`${view.you}-bonus-largest-army`}
@@ -1067,7 +1153,7 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
                   baseWidth={186}
                   baseHeight={120}
                   folderMode={false}
-                  isDraggable={!isMobile}
+                  isDraggable={true}
                   position={
                     cardPositions[`${view.you}-bonus-largest-army`] ||
                     cardPositions['bonus-largest-army']
@@ -1102,7 +1188,21 @@ export const GameDesk3P: React.FC<GameDesk3PProps> = ({
           </div>
 
           <div className="flex flex-col items-end z-10 shrink-0">
-            <div className={`transition-opacity duration-300 ${handCardsDealt ? 'opacity-100' : 'opacity-0'}`}>
+            <div
+              className={`flex items-end justify-end gap-1.5 sm:gap-2 transition-opacity duration-300 ${
+                handCardsDealt ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {/* Mobil: En Uzun Yol & En Güçlü Ordu kartları isim etiketinin hemen üstünde, el kartlarının solunda, çekmecesiz ve üst üste */}
+              {isMobile &&
+                (youHasRoute || youHasArmy) &&
+                renderStackedBonusCards(
+                  view.you,
+                  youHasRoute,
+                  youHasArmy,
+                  mobilePlayerBonusScale,
+                  'mb-0.5'
+                )}
               <FannedHand
                 hand={view.yourHand}
                 isCurrentPlayer={true}
