@@ -18,13 +18,6 @@ interface DeckCardItem {
   alt: string;
 }
 
-const DECK_TITLES: Record<DeckType, string> = {
-  resource: 'Kaynak Destesi',
-  event: 'Olay Destesi',
-  metropolis: 'Büyükşehir Destesi',
-  building: 'İnşaat Destesi',
-};
-
 const DECK_CARDS: Record<DeckType, DeckCardItem[]> = {
   resource: [
     { id: 'brick', imageUrl: assetUrl('/assets/cards/resource/resource_brick.png'), alt: 'Tuğla' },
@@ -59,8 +52,6 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
   deckType,
   onClose,
   metropolisSide,
-  remainingCount,
-  deckTitle,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -96,63 +87,43 @@ export const DeckBrowserModal: React.FC<DeckBrowserModalProps> = ({
     }
   };
 
-  const title = deckTitle || DECK_TITLES[deckType];
-
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-5 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-6 animate-in fade-in duration-150 select-none"
       onClick={onClose}
     >
-      <div
-        className="relative w-full max-w-[95vw] sm:max-w-4xl bg-slate-950/90 border border-amber-500/40 rounded-2xl p-2.5 sm:p-5 shadow-2xl flex flex-col gap-2 sm:gap-3"
-        onClick={(e) => e.stopPropagation()}
+      {/* Kapat Butonu */}
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 text-white/80 hover:text-white bg-white/15 hover:bg-white/25 p-1.5 sm:p-2 rounded-full transition shadow-lg"
+        title="Kapat (ESC)"
       >
-        {/* Üst Bilgi & Kapatma Tuşu Barı */}
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 px-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-amber-300 font-black text-xs sm:text-base tracking-wide">
-              {title}
-            </span>
-            {typeof remainingCount === 'number' && (
-              <span className="bg-amber-500/20 border border-amber-400/50 text-amber-200 font-bold text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full">
-                Destede {remainingCount} Kart Kaldı
-              </span>
-            )}
-          </div>
+        <X size={24} />
+      </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex items-center gap-1.5 bg-red-600/90 hover:bg-red-500 text-white font-bold text-xs sm:text-sm px-3 py-1 sm:py-1.5 rounded-xl transition shadow-lg shrink-0"
-            title="Kapat (ESC)"
-          >
-            <X size={16} />
-            <span>Kapat</span>
-          </button>
-        </div>
-
-        {/* Yatay Kart Gezinme Alanı (Kaydırma butonları kaldırıldı, parmak/fare ile akıcı kaydırma ve sabit kart oranı) */}
-        <div
-          ref={scrollRef}
-          onWheel={handleWheel}
-          className={`overflow-x-auto flex items-center gap-2.5 sm:gap-4 px-2 py-1.5 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing ${
-            cards.length <= 4 ? 'sm:justify-center' : ''
-          }`}
-        >
-          {cards.map((card) => (
-            <div
-              key={card.id}
-              className="shrink-0 w-[135px] h-[210px] sm:w-[195px] sm:h-[302px] rounded-xl overflow-hidden border border-white/15 bg-stone-900 shadow-xl transition-transform hover:scale-[1.03] duration-150 flex flex-col items-center justify-center"
-            >
-              <img
-                src={card.imageUrl}
-                alt={card.alt}
-                className="w-full h-full object-contain pointer-events-none"
-                draggable={false}
-              />
-            </div>
-          ))}
-        </div>
+      {/* Yatay Kart Gezinme Karuseli (Etrafında kutu/çerçeve olmadan sadece saf kartlar) */}
+      <div
+        ref={scrollRef}
+        onWheel={handleWheel}
+        onClick={(e) => e.stopPropagation()}
+        className={`overflow-x-auto flex items-center gap-3 sm:gap-6 px-4 py-2 sm:p-6 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent max-w-full cursor-grab active:cursor-grabbing select-none ${
+          cards.length <= 1 ? 'justify-center' : ''
+        }`}
+      >
+        {cards.map((card) => (
+          <img
+            key={card.id}
+            src={card.imageUrl}
+            alt={card.alt}
+            style={{
+              height: 'min(76dvh, 420px)',
+              aspectRatio: '125 / 194',
+            }}
+            className="shrink-0 object-contain pointer-events-none drop-shadow-2xl transition-transform hover:scale-105 duration-200"
+            draggable={false}
+          />
+        ))}
       </div>
     </div>
   );
