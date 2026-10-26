@@ -5,7 +5,23 @@ const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95a29oa2hhcHRneWVlZXlhdW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NjMxODMsImV4cCI6MjEwODEzOTE4M30.9CoUzP8SI3cPXT7kULQE_bHh1hq8ioU-EHt_P09gQSI';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+function getOrCreateGuestPlayerId(): string {
+  if (typeof window === 'undefined') return '';
+  let guestId = localStorage.getItem('catankard_player_id');
+  if (!guestId) {
+    guestId = crypto.randomUUID();
+    localStorage.setItem('catankard_player_id', guestId);
+  }
+  return guestId;
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      'x-player-id': getOrCreateGuestPlayerId(),
+    },
+  },
+});
 
 /**
  * Oyuncu için şeffaf, sıfır-sürtünmeli misafir kimliği üretir veya getirir.
@@ -19,12 +35,7 @@ export async function ensureAnonymousAuth(): Promise<string> {
     }
   } catch {}
 
-  let guestId = localStorage.getItem('catankard_player_id');
-  if (!guestId) {
-    guestId = crypto.randomUUID();
-    localStorage.setItem('catankard_player_id', guestId);
-  }
-  return guestId;
+  return getOrCreateGuestPlayerId();
 }
 
 /**

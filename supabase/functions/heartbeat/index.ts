@@ -44,6 +44,7 @@ serve(async (req) => {
 
     const { roomId } = body;
     let hostTransferred = false;
+    let view: any = null;
 
     if (roomId) {
       const now = Date.now();
@@ -52,6 +53,17 @@ serve(async (req) => {
         .update({ last_seen_at: new Date(now).toISOString() })
         .eq('room_id', roomId)
         .eq('user_id', userId);
+
+      const { data: viewRow } = await supabase
+        .from('player_views')
+        .select('view')
+        .eq('room_id', roomId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (viewRow?.view) {
+        view = viewRow.view;
+      }
 
       // Kurucu kontrolü ve gerekirse devir:
       const { data: room } = await supabase
@@ -110,7 +122,7 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, hostTransferred }), {
+    return new Response(JSON.stringify({ ok: true, hostTransferred, view }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {

@@ -1,14 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  createGame,
-  getPlayerView,
-  applyAction,
   type Action,
-  type GameConfig,
-  type GameState,
   type PlayerView,
-  type Resource,
-  type ResourceCounts,
 } from '@catankard/engine';
 import { CardModal } from './components/CardModal.tsx';
 import { CharityModal } from './components/CharityModal.tsx';
@@ -30,7 +23,6 @@ export const App: React.FC = () => {
   const [room, setRoom] = useState<any | null>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [playerView, setPlayerView] = useState<PlayerView | null>(null);
-  const [demoState, setDemoState] = useState<GameState | null>(null);
 
   // Modallar
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
@@ -68,47 +60,9 @@ export const App: React.FC = () => {
     localStorage.setItem('catankard_player_name', name);
   };
 
-  const startDemoGame = (count: 3 | 4 = 4) => {
-    const pids = count === 4 ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2', 'p3'];
-    const names: Record<string, string> = {
-      p1: playerName || 'Sina',
-      p2: 'Ahmet',
-      p3: 'Zeynep',
-      p4: 'Can',
-    };
-    const config: GameConfig = {
-      players: pids.map((id) => ({ id, name: names[id] || 'Oyuncu' })),
-      metropolisSide: 'A',
-      turnTimerSeconds: 60,
-      seed: 'demo-seed-42',
-    };
-    const state = createGame(config, Date.now());
-    // Test oyuncusuna inşaat yapabilmesi için kaynak ver
-    state.hands['p1'] = { brick: 4, wood: 4, wheat: 3, wool: 3, ore: 3 };
-    setDemoState(state);
-    setRoom({ id: 'demo-room', status: 'playing', created_by: 'p1' });
-    setRoomId('demo-room');
-    setPlayerView(getPlayerView(state, 'p1'));
-  };
-
+  // 2. Realtime Abonelikleri (Lobi & Oyun Durumu)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const demo = params.get('demo') || params.get('test');
-    if (demo === '4p' || demo === 'true') {
-      startDemoGame(4);
-    } else if (demo === '3p') {
-      startDemoGame(3);
-    }
-    const handleTriggerWin = () => {
-      setPlayerView((prev) => (prev ? { ...prev, winner: 'p1', phase: 'finished' } : null));
-    };
-    window.addEventListener('catankard_trigger_win', handleTriggerWin);
-    return () => window.removeEventListener('catankard_trigger_win', handleTriggerWin);
-  }, []);
-
-  // 2. Realtime Abonelikleri (Lobi & Oyun Durumu - Demo odalarında Supabase dinlenmez)
-  useEffect(() => {
-    if (!roomId || roomId.startsWith('demo-')) return;
+    if (!roomId) return;
 
     // Oda tablosunu dinle
     const roomChannel = supabase
@@ -117,7 +71,17 @@ export const App: React.FC = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
         (payload) => {
-          if (payload.new) setRoom(payload.new);
+          if (payload.new) {
+            const nextRoom: any = payload.new;
+            setRoom(nextRoom);
+            if (nextRoom.status === 'playing') {
+              invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
+                .then((res) => {
+                  if (res.view) setPlayerView(res.view);
+                })
+                .catch(() => {});
+            }
+          }
         }
       )
       .on(
@@ -167,6 +131,11 @@ export const App: React.FC = () => {
 
     fetchRoom(roomId);
     fetchRoomPlayers(roomId);
+    invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
+      .then((res) => {
+        if (res.view) setPlayerView(res.view);
+      })
+      .catch(() => {});
 
     return () => {
       supabase.removeChannel(roomChannel);
@@ -174,12 +143,16 @@ export const App: React.FC = () => {
     };
   }, [roomId, userId]);
 
-  // 3. Heartbeat (Her 15 saniyede bir son görülme zamanını güncelle)
+  // 3. Heartbeat (Her 15 saniyede bir son görülme zamanını güncelle ve görünümü senkronize et)
   useEffect(() => {
     if (!roomId || !userId) return;
 
     const interval = setInterval(() => {
-      invokeEdgeFunction('heartbeat', { roomId }).catch(() => {});
+      invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId })
+        .then((res) => {
+          if (res.view) setPlayerView((prev) => prev ?? res.view!);
+        })
+        .catch(() => {});
     }, 15000);
 
     return () => clearInterval(interval);
@@ -250,18 +223,6 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveRoom = async () => {
-    if (demoState) {
-      setDemoState(null);
-      setRoomId(null);
-      setRoom(null);
-      setPlayers([]);
-      setPlayerView(null);
-      const url = new URL(window.location.href);
-      url.searchParams.delete('demo');
-      url.searchParams.delete('test');
-      window.history.replaceState({}, '', url.pathname);
-      return;
-    }
     if (!roomId) return;
     try {
       await invokeEdgeFunction('lobby', { op: 'leave_room', roomId });
@@ -272,19 +233,8 @@ export const App: React.FC = () => {
     setPlayerView(null);
   };
 
-  // Oyun Hamlesi İletme (Edge Function: game-action veya yerel demo modu)
+  // Oyun Hamlesi İletme (Edge Function: game-action)
   const dispatchAction = async (action: Action) => {
-    if (demoState) {
-      try {
-        const nextState = { ...demoState };
-        applyAction(nextState, 'p1', action, Date.now());
-        setDemoState(nextState);
-        setPlayerView(getPlayerView(nextState, 'p1'));
-      } catch (err: any) {
-        alert(err.message || 'Geçersiz hamle.');
-      }
-      return;
-    }
     if (!roomId) return;
     try {
       const data = await invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('game-action', {
@@ -368,7 +318,6 @@ export const App: React.FC = () => {
           onJoinRoom={handleJoinRoom}
           onStartGame={handleStartGame}
           onLeaveRoom={handleLeaveRoom}
-          onStartDemo={startDemoGame}
         />
       ) : playerView.turnOrder.length === 3 ? (
         <GameDesk3P
