@@ -98,19 +98,35 @@ export const GameMat: React.FC<GameMatProps> = ({
   });
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { isMuted, toggleMute } = useBackgroundMusic();
+  const volumeTrackRef = useRef<HTMLDivElement>(null);
+  const { isMuted, volume, setVolume, toggleMute } = useBackgroundMusic();
 
   useEffect(() => {
-    if (!isMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!isMenuOpen && !isVolumeOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
+        setIsVolumeOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMenuOpen]);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isMenuOpen, isVolumeOpen]);
+
+  const updateVolumeFromPointer = (clientY: number) => {
+    const track = volumeTrackRef.current;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    if (rect.height <= 0) return;
+    const ratio = 1 - (clientY - rect.top) / rect.height;
+    setVolume(Math.max(0, Math.min(1, ratio)));
+  };
 
   const handleSelectTheme = (id: TableThemeId) => {
     setThemeId(id);
@@ -159,27 +175,85 @@ export const GameMat: React.FC<GameMatProps> = ({
         className="fixed top-1.5 right-2 sm:top-14 sm:right-4 z-[60] flex items-center gap-1.5 pointer-events-auto"
         ref={menuRef}
       >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleMute();
-          }}
-          title={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
-          aria-label={isMuted ? 'Müziğin Sesini Aç' : 'Müziği Sessize Al'}
-          className={`flex items-center justify-center p-1.5 sm:p-2 rounded-full bg-black/75 hover:bg-black/95 border backdrop-blur-md transition shadow-lg cursor-pointer ${
-            isMuted
-              ? 'text-red-400 border-red-500/50 hover:text-red-300'
-              : 'text-amber-300 border-amber-500/50 hover:text-amber-100'
-          }`}
-        >
-          {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-        </button>
+        <div className="relative flex flex-col items-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMenuOpen(false);
+              setIsVolumeOpen((prev) => !prev);
+            }}
+            title="Ses Seviyesi ve Sessize Alma"
+            aria-label="Ses Seviyesi ve Sessize Alma"
+            className={`flex items-center justify-center p-1.5 sm:p-2 rounded-full bg-black/75 hover:bg-black/95 border backdrop-blur-md transition shadow-lg cursor-pointer ${
+              isMuted
+                ? 'text-red-400 border-red-500/50 hover:text-red-300'
+                : 'text-amber-300 border-amber-500/50 hover:text-amber-100'
+            }`}
+          >
+            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
+
+          {/* Dikey Ses Seviyesi Çubuğu */}
+          {isVolumeOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full mt-1.5 py-2.5 px-2 rounded-2xl bg-black/90 border border-amber-600/40 backdrop-blur-md shadow-2xl flex flex-col items-center gap-2 z-50 animate-in fade-in zoom-in-95 duration-150"
+            >
+              <span className="text-[9px] font-black text-amber-300 font-mono leading-none select-none">
+                {Math.round(volume * 100)}%
+              </span>
+
+              <div
+                ref={volumeTrackRef}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  updateVolumeFromPointer(e.clientY);
+                }}
+                onPointerMove={(e) => {
+                  if (e.buttons > 0 || e.pressure > 0) {
+                    updateVolumeFromPointer(e.clientY);
+                  }
+                }}
+                className="relative w-2.5 h-24 sm:h-28 rounded-full bg-zinc-800/95 border border-white/15 cursor-pointer touch-none flex items-end overflow-visible shadow-inner"
+              >
+                <div
+                  className="w-full rounded-full bg-gradient-to-t from-amber-600 via-amber-400 to-amber-300 transition-[height] duration-75"
+                  style={{ height: `${Math.round(volume * 100)}%` }}
+                />
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-amber-300 border-2 border-black shadow-[0_0_8px_rgba(251,191,36,0.9)] pointer-events-none"
+                  style={{ bottom: `calc(${Math.round(volume * 100)}% - 8px)` }}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMute();
+                }}
+                title={isMuted ? 'Sesi Aç' : 'Sessize Al'}
+                className={`p-1 rounded-full transition cursor-pointer ${
+                  isMuted
+                    ? 'text-red-400 bg-red-500/20 hover:bg-red-500/30'
+                    : 'text-amber-300/80 hover:text-amber-200 hover:bg-white/10'
+                }`}
+              >
+                {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="relative">
           <button
             type="button"
-            onClick={() => setIsMenuOpen((prev) => !prev)}
+            onClick={() => {
+              setIsVolumeOpen(false);
+              setIsMenuOpen((prev) => !prev);
+            }}
             title="Masa Çuhası Rengini Değiştir"
             className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] sm:text-xs rounded-full bg-black/60 hover:bg-black/85 text-amber-200 border border-amber-600/40 backdrop-blur-md transition shadow-lg group cursor-pointer"
           >

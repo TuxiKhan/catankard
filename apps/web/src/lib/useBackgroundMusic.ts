@@ -3,10 +3,16 @@ import { assetUrl } from './assetUrl.ts';
 import { cardAudio } from './animationHooks.ts';
 
 const MUTE_STORAGE_KEY = 'catankard_bgm_muted';
+const VOLUME_STORAGE_KEY = 'catankard_bgm_volume';
 const AUDIO_ELEMENT_ID = 'catankard-singleton-bgm-audio';
-const TARGET_VOLUME = 0.32;
+const DEFAULT_VOLUME = 0.35;
 
-const muteListeners = new Set<(muted: boolean) => void>();
+interface AudioState {
+  muted: boolean;
+  volume: number;
+}
+
+const stateListeners = new Set<(state: AudioState) => void>();
 let isPlayRequested = false;
 let playPromiseInFlight: Promise<void> | null = null;
 
@@ -19,6 +25,25 @@ function getInitialMuted(): boolean {
   }
 }
 
+function getInitialVolume(): number {
+  if (typeof window === 'undefined') return DEFAULT_VOLUME;
+  try {
+    const raw = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_VOLUME;
+}
+
+function clampVolume(v: number): number {
+  if (!Number.isFinite(v)) return DEFAULT_VOLUME;
+  return Math.max(0, Math.min(1, v));
+}
+
 /**
  * Sayfada yalnızca TEK bir <audio> elemanı olmasını garanti eder.
  * Birden fazla örnek oluşup yankı (echo) yapmasını engeller.
@@ -28,7 +53,6 @@ function getSingletonAudioElement(): HTMLAudioElement | null {
 
   let el = document.getElementById(AUDIO_ELEMENT_ID) as HTMLAudioElement | null;
   if (!el) {
-    // Varsa sahipsiz diğer audio etiketlerini temizle
     document.querySelectorAll('audio[data-catankard-bgm="true"]').forEach((node) => {
       try {
         (node as HTMLAudioElement).pause();
@@ -46,9 +70,10 @@ function getSingletonAudioElement(): HTMLAudioElement | null {
     el.style.display = 'none';
 
     const initialMuted = getInitialMuted();
-    el.muted = initialMuted;
-    el.volume = initialMuted ? 0 : TARGET_VOLUME;
-    cardAudio.setEnabled(!initialMuted);
+    const initialVol = getInitialVolume();
+    el.muted = initialMuted || initialVol === 0;
+    el.volume = initialMuted ? 0 : initialVol;
+    cardAudio.setEnabled(!el.muted);
 
     // Döngü garantisi: Parça bittiğinde baştan tekrar başlasın
     el.addEventListener('ended', () => {
@@ -82,25 +107,33 @@ function safePlayAudio(audio: HTMLAudioElement) {
   }
 }
 
-function applyMuteState(muted: boolean) {
+function notifyListeners(muted: boolean, volume: number) {
+  stateListeners.forEach((fn) => fn({ muted, volume }));
+}
+
+function applyAudioSettings(nextMuted: boolean, nextVolume: number) {
+  const safeVol = clampVolume(nextVolume);
+  const effectiveMuted = nextMuted || safeVol === 0;
   const audio = getSingletonAudioElement();
+
   if (audio) {
-    // Hem muted hem volume=0 birlikte uygulanır (iOS/Android/Masaüstü tam uyumluluk için)
-    audio.muted = muted;
-    audio.volume = muted ? 0 : TARGET_VOLUME;
+    audio.muted = effectiveMuted;
+    audio.volume = effectiveMuted ? 0 : safeVol;
     if (isPlayRequested && audio.paused) {
       safePlayAudio(audio);
     }
   }
 
-  // Kart efekt seslerini de senkronize kapat/aç
-  cardAudio.setEnabled(!muted);
+  cardAudio.setEnabled(!effectiveMuted);
 
   try {
-    localStorage.setItem(MUTE_STORAGE_KEY, String(muted));
+    localStorage.setItem(MUTE_STORAGE_KEY, String(effectiveMuted));
+    if (safeVol > 0) {
+      localStorage.setItem(VOLUME_STORAGE_KEY, String(safeVol));
+    }
   } catch {}
 
-  muteListeners.forEach((fn) => fn(muted));
+  notifyListeners(effectiveMuted, safeVol);
 }
 
 /**
@@ -110,16 +143,22 @@ function applyMuteState(muted: boolean) {
  */
 export function useBackgroundMusic(isPlaying?: boolean) {
   const [isMuted, setIsMuted] = useState<boolean>(getInitialMuted);
+  const [volume, setVolumeState] = useState<number>(getInitialVolume);
 
   useEffect(() => {
-    const current = getInitialMuted();
-    setIsMuted(current);
-    cardAudio.setEnabled(!current);
+    const currentMuted = getInitialMuted();
+    const currentVol = getInitialVolume();
+    setIsMuted(currentMuted);
+    setVolumeState(currentVol);
+    cardAudio.setEnabled(!(currentMuted || currentVol === 0));
 
-    const listener = (muted: boolean) => setIsMuted(muted);
-    muteListeners.add(listener);
+    const listener = (state: AudioState) => {
+      setIsMuted(state.muted);
+      setVolumeState(state.volume);
+    };
+    stateListeners.add(listener);
     return () => {
-      muteListeners.delete(listener);
+      stateListeners.delete(listener);
     };
   }, []);
 
@@ -131,8 +170,9 @@ export function useBackgroundMusic(isPlaying?: boolean) {
     if (!audio) return;
 
     const muted = getInitialMuted();
-    audio.muted = muted;
-    audio.volume = muted ? 0 : TARGET_VOLUME;
+    const vol = getInitialVolume();
+    audio.muted = muted || vol === 0;
+    audio.volume = muted ? 0 : vol;
 
     if (!isPlaying) {
       audio.pause();
@@ -158,13 +198,22 @@ export function useBackgroundMusic(isPlaying?: boolean) {
   }, [isPlaying]);
 
   const toggleMute = useCallback(() => {
-    const audio = getSingletonAudioElement();
-    const currentlyMuted = audio ? audio.muted || audio.volume === 0 : getInitialMuted();
-    applyMuteState(!currentlyMuted);
+    const currentlyMuted = getInitialMuted();
+    const currentVol = getInitialVolume();
+    const nextMuted = !currentlyMuted;
+    const restoredVol = !nextMuted && currentVol === 0 ? DEFAULT_VOLUME : currentVol;
+    applyAudioSettings(nextMuted, restoredVol);
+  }, []);
+
+  const setVolume = useCallback((newVol: number) => {
+    const safeVol = clampVolume(newVol);
+    applyAudioSettings(safeVol === 0, safeVol);
   }, []);
 
   return {
     isMuted,
+    volume: isMuted ? 0 : volume,
+    setVolume,
     toggleMute,
   };
 }
