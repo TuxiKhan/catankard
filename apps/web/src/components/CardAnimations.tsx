@@ -90,56 +90,18 @@ export const CARD_ANIMATION_STYLES = `
   }
 }
 
-@keyframes replenishCardReveal {
+@keyframes replenishSlideIn {
   0% {
     opacity: 0;
-    transform: translate3d(-48px, -10px, 0) scale(0.86);
+    transform: translate3d(-35px, -15px, 0) scale(0.9);
   }
-  55% {
+  60% {
     opacity: 1;
-    transform: translate3d(4px, 0, 0) scale(1.04);
+    transform: translate3d(2px, 0, 0) scale(1.03);
   }
   100% {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes replenishBackFadeOut {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  45% {
-    opacity: 1;
-    transform: scaleX(0.08) scaleY(1.04);
-  }
-  50% {
-    opacity: 0;
-    transform: scaleX(0) scaleY(1.04);
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(0) scaleY(1);
-  }
-}
-
-@keyframes replenishFrontFlipIn {
-  0% {
-    opacity: 0;
-    transform: scaleX(0) scaleY(1.04);
-  }
-  45% {
-    opacity: 0;
-    transform: scaleX(0.08) scaleY(1.04);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(0.12) scaleY(1.04);
-  }
-  100% {
-    opacity: 1;
-    transform: scaleX(1) scaleY(1);
   }
 }
 
@@ -708,13 +670,15 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
 
       <div
         key={card.id}
-        className={`w-full h-full relative transition-transform duration-200 ${
-          isReplenishing ? '' : canAfford ? 'hover:scale-105 cursor-pointer' : 'hover:scale-[1.02]'
-        }`}
+        className={`w-full h-full relative rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 ${
+          canAfford
+            ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)] cursor-pointer'
+            : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50'
+        } ${isReplenishing ? '' : canAfford ? 'hover:scale-105' : 'hover:scale-[1.02]'}`}
         style={
           isReplenishing
             ? {
-                animation: 'replenishCardReveal 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
+                animation: 'replenishSlideIn 0.55s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
               }
             : undefined
         }
@@ -732,56 +696,23 @@ export const ReplenishCardSlot: React.FC<ReplenishCardSlotProps> = ({
         onContextMenu={onContextMenu}
         onDoubleClick={onDoubleClick}
       >
-        {/* Ön Yüz (Her zaman 0deg düzlemde net ve hatasız görünür) */}
-        <div
-          className={`absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border transition-all duration-200 ${
-            canAfford
-              ? 'border-sky-400 ring-2 ring-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.85)] hover:shadow-[0_0_24px_rgba(56,189,248,1)]'
-              : 'border-white/20 opacity-90 hover:opacity-100 hover:border-white/50'
-          }`}
-          style={
-            isReplenishing
-              ? {
-                  animation: 'replenishFrontFlipIn 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
-                }
-              : undefined
-          }
-        >
-          <img
-            src={getBuildingImageUrl(card.type)}
-            alt={card.type}
-            className="w-full h-full object-contain"
-            draggable={false}
-          />
+        <img
+          src={getBuildingImageUrl(card.type)}
+          alt={card.type}
+          className="w-full h-full object-contain pointer-events-none"
+          draggable={false}
+        />
 
-          {isReplenishing && (
-            <div
-              className="absolute inset-0 pointer-events-none overflow-hidden"
-              style={{ zIndex: 10 }}
-            >
-              <div
-                className="w-16 h-full bg-linear-to-r from-transparent via-white/70 to-transparent blur-xs"
-                style={{
-                  animation: 'cardSheenGlide 0.65s 0.35s ease-out forwards',
-                }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Arka Yüz (Sadece yeni kart açılırken ilk yarıda gözüküp kaybolur, sonrasında DOM'da bile kalmaz!) */}
         {isReplenishing && (
           <div
-            className="absolute inset-0 rounded-md sm:rounded-lg overflow-hidden border border-emerald-600/80 shadow-lg bg-emerald-950 pointer-events-none"
-            style={{
-              animation: 'replenishBackFadeOut 0.72s cubic-bezier(0.2, 0.85, 0.3, 1) forwards',
-            }}
+            className="absolute inset-0 pointer-events-none overflow-hidden"
+            style={{ zIndex: 10 }}
           >
-            <img
-              src={assetUrl('/assets/cards/building/building_back.png')}
-              alt="Kapalı Kart"
-              className="w-full h-full object-contain"
-              draggable={false}
+            <div
+              className="w-16 h-full bg-linear-to-r from-transparent via-white/80 to-transparent blur-xs"
+              style={{
+                animation: 'cardSheenGlide 0.6s 0.15s ease-out forwards',
+              }}
             />
           </div>
         )}

@@ -255,9 +255,9 @@ export function handleAction(
         fromHand[r] += offer.want[r];
       }
 
-      // RESMİ KURAL: Aktif oyuncuyla takas yapan diğer oyuncu desteden 1 bonus kaynak çeker!
-      // Birebir değiş tokuş: Ekstra bonus kaynak verilmez
-
+      // RESMİ KURAL: Aktif oyuncuyla takas yapan diğer oyuncu (pasif partner) desteden 1 bonus kaynak çeker!
+      const tradingPartner = offer.fromPlayerId === activePid ? actor : offer.fromPlayerId;
+      giveResourcesToPlayer(state, tradingPartner, 1);
 
       offer.status = 'accepted';
       state.turnFlags.traded = true;

@@ -12,6 +12,7 @@ import { GameDesk4P } from './components/GameDesk4P.tsx';
 import { Lobby } from './components/Lobby.tsx';
 import { RobberModal } from './components/RobberModal.tsx';
 import { TradeModal } from './components/TradeModal.tsx';
+import { EventCelebrationModal } from './components/EventCelebrationModal.tsx';
 import { getCardDetails, type CardDetails } from './lib/cardImages.ts';
 import { ensureAnonymousAuth, invokeEdgeFunction, supabase } from './lib/supabase.ts';
 import { useBackgroundMusic } from './lib/useBackgroundMusic.ts';
@@ -30,7 +31,8 @@ export const App: React.FC = () => {
   // Modallar
   const [inspectedCard, setInspectedCard] = useState<CardDetails | null>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
-  const [eventNotification, setEventNotification] = useState<string | null>(null);
+  const [activeCelebrationEvent, setActiveCelebrationEvent] = useState<any | null>(null);
+  const lastCelebratedEventRef = useRef<string | null>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreen();
   const [isPortraitMode, setIsPortraitMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -69,9 +71,29 @@ export const App: React.FC = () => {
   const syncPlayerView = (targetRoomId: string) => {
     invokeEdgeFunction<{ ok: boolean; view?: PlayerView }>('heartbeat', { roomId: targetRoomId })
       .then((res) => {
-        if (res.view) setPlayerView(res.view);
+        if (res.view) {
+          setPlayerView(res.view);
+          triggerEventCelebration(res.view);
+        }
       })
       .catch(() => {});
+  };
+
+  const triggerEventCelebration = (view: PlayerView) => {
+    if (!view.lastEvent || !view.recentLog) return;
+    // En son olay kaydını tespit et (event log entry)
+    const lastEventLogIndex = view.recentLog
+      .map((entry, idx) => ({ entry, idx }))
+      .filter((item) => item.entry.t === 'event')
+      .pop();
+
+    if (lastEventLogIndex) {
+      const eventKey = `${view.lastEvent}-${lastEventLogIndex.idx}-${view.turnNumber}`;
+      if (lastCelebratedEventRef.current !== eventKey) {
+        lastCelebratedEventRef.current = eventKey;
+        setActiveCelebrationEvent(view.lastEvent);
+      }
+    }
   };
 
   useEffect(() => {
@@ -122,22 +144,7 @@ export const App: React.FC = () => {
           if (payload.new && payload.new.user_id === userId) {
             const nextView: PlayerView = payload.new.view;
             setPlayerView(nextView);
-
-            // Yeni olay bildirim kontrolü
-            if (nextView.lastEvent) {
-              const eventMessages: Record<string, string> = {
-                robber: '🏴‍☠️ HIRSIZ! 7\'den fazla kaynağı olan tüm oyuncular elinin yarısını atıyor.',
-                solstice: '☀️ YENİ YIL! Her oyuncu 1 kaynak çekti ve olay destesi yeniden karıştırıldı.',
-                abundance: '🌾 BOLLUK! En Uzun Yol ve En Büyük Ordu\'ya sahip olmayanlar 2 kaynak kazandı.',
-                subsidy: '🎉 HASAT KUTLAMASI! Her oyuncu masadaki her köyü için 1 kaynak çekti.',
-                charity: '🤝 SADAKA! En çok zafer puanına sahip oyuncular en az puanlılara 1 kaynak veriyor.',
-              };
-              const msg = eventMessages[nextView.lastEvent];
-              if (msg) {
-                setEventNotification(msg);
-                setTimeout(() => setEventNotification(null), 7000);
-              }
-            }
+            triggerEventCelebration(nextView);
           }
         }
       )
@@ -254,6 +261,7 @@ export const App: React.FC = () => {
       });
       if (data.view) {
         setPlayerView(data.view);
+        triggerEventCelebration(data.view);
       }
       roomChannelRef.current?.send({
         type: 'broadcast',
@@ -301,18 +309,11 @@ export const App: React.FC = () => {
 
   return (
     <div className={`relative w-full h-full min-h-screen ${isGameActive ? 'overflow-hidden' : 'overflow-y-auto bg-slate-950'}`}>
-      {/* Olay Bildirimi Banner'ı */}
-      {eventNotification && (
-        <div className="fixed top-7 lg:top-14 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-black px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-2xl border-2 border-amber-300 animate-in slide-in-from-top duration-300 flex items-center gap-2.5 max-w-xl text-center">
-          <span className="text-xs sm:text-sm md:text-base">{eventNotification}</span>
-          <button
-            onClick={() => setEventNotification(null)}
-            className="text-xs bg-slate-950/20 hover:bg-slate-950/40 text-slate-950 px-2 py-0.5 rounded-lg font-bold"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      {/* Olay Kartı Canlı Animasyon & Efekt Kutlaması */}
+      <EventCelebrationModal
+        event={activeCelebrationEvent}
+        onClose={() => setActiveCelebrationEvent(null)}
+      />
 
       {/* Gelen Takas Teklifi Bildirimi */}
       {incomingOffers.length > 0 && !isTradeModalOpen && playerView && (

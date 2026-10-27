@@ -305,7 +305,7 @@ export const BuildingRowMat: React.FC<BuildingRowMatProps> = ({
 
       return (
         <ReplenishCardSlot
-          key={'building-slot-' + index}
+          key={card ? `building-slot-${card.id}` : `building-slot-empty-${index}`}
           card={card}
           index={index}
           width={cardW}
