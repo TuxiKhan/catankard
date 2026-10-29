@@ -3,7 +3,6 @@ import type { PlayerView } from '@catankard/engine';
 import { BuildingRowMat } from './BuildingRowMat.tsx';
 import { Palette, Check, Volume2, VolumeX, Info } from 'lucide-react';
 import { useBackgroundMusic } from '../lib/useBackgroundMusic.ts';
-import { GameGuideModal } from './GameGuideModal.tsx';
 
 export type TableThemeId = 'bordo' | 'emerald' | 'midnight' | 'anthracite';
 
@@ -100,7 +99,6 @@ export const GameMat: React.FC<GameMatProps> = ({
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const volumeTrackRef = useRef<HTMLDivElement>(null);
   const { isMuted, volume, setVolume, toggleMute } = useBackgroundMusic();
@@ -304,27 +302,18 @@ export const GameMat: React.FC<GameMatProps> = ({
           )}
         </div>
 
-        {/* Oyun Kılavuzu & Kart Detayları ("i" Butonu) */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsVolumeOpen(false);
-            setIsMenuOpen(false);
-            setIsGuideOpen(true);
-          }}
-          title="Oyun Kılavuzu & Kart Detayları"
-          aria-label="Oyun Kılavuzu ve Kart Detayları"
+        {/* Nasıl Oynanır Video Linki ("i" Butonu) */}
+        <a
+          href="https://www.youtube.com/watch?v=OTcwVq16PgQ&t=499s&pp=ygUgY2F0YW4ga2FydCBveXVudSBuYXPEsWwgb3luYW7EsXI%3D"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Catan Kart Oyunu Nasıl Oynanır? (YouTube)"
+          aria-label="Nasıl Oynanır Videosu"
           className="flex items-center justify-center p-1.5 sm:p-2 rounded-full bg-black/75 hover:bg-black/95 border border-amber-500/50 text-amber-300 hover:text-amber-100 backdrop-blur-md transition shadow-lg cursor-pointer"
         >
           <Info size={15} />
-        </button>
+        </a>
       </div>
-
-      {/* Oyun Kılavuzu Modalı */}
-      <GameGuideModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
-      />
 
       {/* ============================================================== */}
       {/* İÇERİK KATMANI: Children varsa render et, yoksa BuildingRowMat  */}
