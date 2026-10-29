@@ -13,7 +13,9 @@ import {
   Shield,
   Layers,
   Sparkles,
+  Info,
 } from 'lucide-react';
+import { GameGuideModal } from './GameGuideModal.tsx';
 
 interface LobbyProps {
   currentUserId: string;
@@ -50,6 +52,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [guideTab, setGuideTab] = useState<'rules' | 'cards'>('rules');
 
   const isHost = room?.created_by === currentUserId;
   const canStart = isHost && (players.length === 3 || players.length === 4);
@@ -109,7 +113,24 @@ export const Lobby: React.FC<LobbyProps> = ({
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-red-700/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* ÜST BAŞLIK & MARKA */}
-      <header className="w-full max-w-lg text-center pt-4 pb-2 z-10">
+      <header className="w-full max-w-lg text-center pt-4 pb-2 z-10 relative">
+        {/* Kılavuz & "i" Butonu */}
+        <button
+          type="button"
+          onClick={() => {
+            setGuideTab('rules');
+            setIsGuideOpen(true);
+          }}
+          title="Oyun Kılavuzu & Kart Detayları"
+          aria-label="Oyun Kılavuzu ve Kart Detayları"
+          className="absolute right-0 top-3 sm:top-4 p-2 sm:px-3 sm:py-2 rounded-2xl bg-slate-900/90 hover:bg-amber-500/20 text-amber-400 hover:text-amber-300 border border-amber-500/40 hover:border-amber-400/70 shadow-lg backdrop-blur-md transition-all duration-200 group flex items-center gap-1.5 cursor-pointer ring-1 ring-amber-500/20"
+        >
+          <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center font-bold text-xs text-amber-300 border border-amber-400/40 group-hover:scale-105 transition-transform">
+            i
+          </div>
+          <span className="hidden sm:inline text-xs font-bold tracking-wide">Nasıl Oynanır?</span>
+        </button>
+
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-3 tracking-wide">
           <Compass size={14} className="text-amber-400" />
           <span>CATAN · ON THE ROAD</span>
@@ -462,10 +483,44 @@ export const Lobby: React.FC<LobbyProps> = ({
       </main>
 
       {/* ALT BİLGİ & SÜRÜM */}
-      <footer className="text-center text-xs text-slate-500 py-4 z-10 flex items-center gap-2">
-        <Shield size={12} className="text-amber-500/70" />
-        <span>Catan: On the Road v1.0 · Ponytail Edition</span>
+      <footer className="text-center text-xs text-slate-500 py-4 z-10 flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1.5">
+          <Shield size={12} className="text-amber-500/70" />
+          <span>Catan: On the Road v1.0 · Ponytail Edition</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setGuideTab('rules');
+              setIsGuideOpen(true);
+            }}
+            className="text-amber-400 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1 cursor-pointer transition"
+          >
+            <Info size={12} />
+            <span>Nasıl Oynanır?</span>
+          </button>
+          <span className="text-slate-700">•</span>
+          <button
+            type="button"
+            onClick={() => {
+              setGuideTab('cards');
+              setIsGuideOpen(true);
+            }}
+            className="text-amber-400 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1 cursor-pointer transition"
+          >
+            <Layers size={12} />
+            <span>Kart Tanıtımları</span>
+          </button>
+        </div>
       </footer>
+
+      {/* Oyun Kılavuzu & Kart Detayları Modalı */}
+      <GameGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+        initialTab={guideTab}
+      />
     </div>
   );
 };
