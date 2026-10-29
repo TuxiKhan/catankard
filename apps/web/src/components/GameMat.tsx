@@ -304,7 +304,7 @@ export const GameMat: React.FC<GameMatProps> = ({
 
         {/* Nasıl Oynanır Video Linki ("i" Butonu) */}
         <a
-          href="https://www.youtube.com/watch?v=OTcwVq16PgQ&t=499s&pp=ygUgY2F0YW4ga2FydCBveXVudSBuYXPEsWwgb3luYW7EsXI%3D"
+          href="https://youtu.be/OTcwVq16PgQ?si=J8a_YD40yzQBwhiN"
           target="_blank"
           rel="noopener noreferrer"
           title="Catan Kart Oyunu Nasıl Oynanır? (YouTube)"
